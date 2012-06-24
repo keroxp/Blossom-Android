@@ -1,6 +1,7 @@
 /**
- * 
+ * view 
  */
+
 package me.keroxp.app.blossom;
 
 import android.view.View;
