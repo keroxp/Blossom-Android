@@ -31,20 +31,23 @@ import android.content.res.Resources;
 import android.content.res.XmlResourceParser;
 import android.text.ClipboardManager;
 
-public final class Blossom extends InputMethodService implements KeyboardView.OnKeyboardActionListener {
+public final class Blossom extends InputMethodService{
     
-//	private InputMethodManager mInputMethodManager;
+	private InputMethodManager mInputMethodManager;
+	private String mWordSeparators;
+
 //	public BLKey[][] keys;
 //	public BLKeyView keyView;
 	// Keyboardオブジェクト
-	public BLKeyboard mainKeyboard;
+	private BLKeyboard mainKeyboard;
 	// 現在のKeyboardオブジェクト
-	public BLKeyboard currentKeyboard;
+	private BLKeyboard currentKeyboard;
 	// KeyboardView
-	public BLKeyboardView keyboardView;
+	private BLKeyboardView keyboardView;
 	// Keyboardのイベントハンドラ
-	public BLKeyboardController keyboardController;
+	private BLKeyboardController keyboardController;
 	// 候補ビューとかパイビューもこいつが管理する必要がある？
+	
 	
     private int mLastDisplayWidth;
 //	
@@ -63,7 +66,9 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 	@Override public void onCreate(){
 		super.onCreate();	
 		// こいつが何なのかは分からない
-        //mInputMethodManager = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
+        mInputMethodManager = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
+        // こいつもよく分からない
+        mWordSeparators = getResources().getString(R.string.word_separators);
 	}
 	
 	/**
@@ -83,17 +88,17 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 		mainKeyboard = new BLKeyboard(this, R.xml.qwerty);
 		// イベント処理は全部コイツに投げる
 		keyboardController = new BLKeyboardController();
-		
-		// Xmlからキー情報を取得
-//		XmlResourceParser parser = (XmlResourceParser)getResources().getXml(R.xml.dictionary);
-//		for(int i = 0 , max = rows.length ; i < max ; i++){
-//			for(int j = 0 , maxx = rows[i].length ; j < maxx ; j++){
-//				// Xmlをパースしてキーに対応する辞書オブジェクトを作成
-//				BLPieDictionary dict = this.getDictionaryFromXml(rows[i][j], parser);
-//				keys[i][j] = new BLKey(0,0,10,10,rows[i][j],dict);
-//			}
-//		}
 	}
+	
+	/**
+     * Called by the framework when your view for showing candidates needs to
+     * be generated, like {@link #onCreateInputView}.
+     */
+    @Override 
+    public View onCreateCandidatesView() {
+    	// 候補ビューはとりあえずいまは使わないから放置
+        return null;
+    }
 	
 	/**
      * This is the main point where we do our initialization of the input method
@@ -124,7 +129,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 	@Override public void onStartInputView(EditorInfo info, boolean restarting) {
 		super.onStartInputView(info, restarting);
         // Apply the selected keyboard to the input view.
-        keyboardView.setKeyboard(currentKeyboard);
+        //keyboardView.setKeyboard(currentKeyboard);
         keyboardView.closing();
         // コメントアウトしておかないと落ちる 2.x系
         //final InputMethodSubtype subtype = mInputMethodManager.getCurrentInputMethodSubtype();
@@ -133,6 +138,9 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 
     @Override public void onFinishInput() {
     	super.onFinishInput();
+    	if (keyboardView != null) {
+            keyboardView.closing();
+        }
     }
     
     @Override public boolean onKeyDown(int keyCode, KeyEvent keyEvent) {

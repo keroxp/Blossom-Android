@@ -16,6 +16,11 @@
             </intent-filter>
             <meta-data android:name="android.view.im" android:resource="@xml/method" />
         </service>
+        <!-- Optional activities. A good idea to have some user settings. -->
+        <!-- activity android:name="BlossomSettings" android:label="@string/blossom_settings">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+            </intent-filter>
+        </activity --> 
     </application>
-
 </manifest>
