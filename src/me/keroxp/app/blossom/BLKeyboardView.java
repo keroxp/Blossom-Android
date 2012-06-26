@@ -17,5 +17,9 @@ public class BLKeyboardView extends KeyboardView {
 		super(context, attrs);
 		// TODO Auto-generated constructor stub
 	}
+	
+	public BLKeyboardView(Context context, AttributeSet attrs, int defStyle){
+		super(context, attrs, defStyle);
+	}
 
 }
