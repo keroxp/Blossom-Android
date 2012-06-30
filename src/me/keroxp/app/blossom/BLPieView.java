@@ -23,10 +23,11 @@ import android.widget.TextView;
  */
 
 enum PieceDirection {Up, UpRight, BottomRight, BottomLeft, UpLeft};
+
 public class BLPieView extends View{
 	
-	private String[] pieces;
-	private String center;
+	public String[] pieces;
+	public String center;
 	private View centerView;
 	private View[] pieceViews;
 
@@ -34,10 +35,13 @@ public class BLPieView extends View{
 	public BLPieView(Context context, AttributeSet attr, String key) {
 		super(context, attr);
 		try {
+			// キー対応表を取得
 			JSONObject localDict = this.getDictionary().getJSONObject(key);
 			if(localDict != null){
+				// センターオブジェクトを作成
 				this.center = localDict.getString("center");
 				this.centerView = new BLPieCenterView(context, this.center);
+				// ピースオブジェクトを作成
 				JSONArray pieces = localDict.getJSONArray("pieces");
 				for(int i = 0 ; i < pieces.length() ; i++) {
 					this.pieces[i] = pieces.getString(i);
@@ -57,6 +61,11 @@ public class BLPieView extends View{
 	
 	@Override
 	protected void onMeasure (int widthMeasureSpec, int heightMeasureSpec) {
+		
+	}
+	
+	// ピースの選択状態を変えるメソッド
+	public void hilightPieceAtIndex(int dir) {
 		
 	}
 	
