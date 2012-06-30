@@ -10,7 +10,6 @@ package me.keroxp.app.blossom;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.XmlResourceParser;
-import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.inputmethodservice.Keyboard;
 import android.util.Log;
@@ -89,7 +88,7 @@ public class BLKeyboard extends Keyboard {
     }
     
     static class BLKey extends Keyboard.Key {    
-        BLPie pie;
+        //BLPie pie;
         Boolean isMetaKey;
         public BLKey(Resources res, Keyboard.Row parent, int x, int y, XmlResourceParser parser) {
             super(res, parent, x, y, parser);                             	
@@ -123,6 +122,7 @@ public class BLKeyboard extends Keyboard {
         }
         
         // Pieのクラス。ここに書く意味があるのかは分からない
+        /*
         private class BLPie{    	
         	BLPiePiece center;
         	BLPiePiece[] pieces;
@@ -147,6 +147,7 @@ public class BLKeyboard extends Keyboard {
             		this.index = index;
             	}
             }
-        }                       
+        }
+        */                      
     }
 }

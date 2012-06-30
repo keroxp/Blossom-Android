@@ -22,11 +22,11 @@
     android:keyWidth="10%p"
     android:horizontalGap="0px"
     android:verticalGap="0px"
-    android:keyHeight="@dimen/key_height"
+    android:keyHeight="@dimen/key_height"    
     >
 
     <Row>
-        <Key android:codes="113" android:keyLabel="q" android:keyEdgeFlags="left"/>
+        <Key android:codes="113" android:keyLabel="q" android:keyEdgeFlags="left" android:keyBackground="@drawable/keybgred" />
         <Key android:codes="119" android:keyLabel="w"/>
         <Key android:codes="101" android:keyLabel="e"/>
         <Key android:codes="114" android:keyLabel="r"/>
@@ -41,7 +41,8 @@
     <Row>
         <Key android:codes="97" android:keyLabel="a" android:horizontalGap="5%p" 
                 android:keyEdgeFlags="left"/>
-        <Key android:codes="115" android:keyLabel="s"/>
+        <Key android:codes="115" android:keyLabel="s"
+            	android:popupKeyboard="@layout/popup" android:popupCharacters="さしすせそ"/>
         <Key android:codes="100" android:keyLabel="d"/>
         <Key android:codes="102" android:keyLabel="f"/>
         <Key android:codes="103" android:keyLabel="g"/>
