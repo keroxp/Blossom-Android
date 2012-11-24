@@ -16,20 +16,14 @@
 ** See the License for the specific language governing permissions and 
 ** limitations under the License.
 */
-		android:keyBackground="@drawable/keybggray"
-		android:shadowColor="#000000"
-		android:shadowRadius="0"
-		android:background="#00000000"
-		
 -->
 
-<me.keroxp.app.blossom.BLKeyboardView
-        xmlns:android="http://schemas.android.com/apk/res/android"
-        android:id="@+id/keyboard"
-        android:layout_alignParentBottom="true"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:keyTextColor="#ffffff"
-		android:labelTextSize="18sp"
-		android:keyPreviewLayout="@layout/preview"
-        />
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content" 
+    android:layout_height="80sp"
+    android:textSize="40sp"
+    android:textColor="?android:attr/textColorPrimaryInverse"
+    android:minWidth="32dip"
+    android:gravity="center"
+    android:background="@drawable/pie"
+    />

@@ -11,6 +11,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import android.content.Context;
+import android.graphics.Canvas;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
@@ -30,7 +31,11 @@ public class BLPieView extends View{
 	public String center;
 	private View centerView;
 	private View[] pieceViews;
-
+	
+	public BLPieView(Context context, AttributeSet attr) {
+		super(context, attr);
+	}
+	
 	// メインコンストラクタ
 	public BLPieView(Context context, AttributeSet attr, String key) {
 		super(context, attr);
@@ -89,6 +94,10 @@ public class BLPieView extends View{
 				bufferedReader.close();
 			}
 		}
+	}
+	
+	@Override
+	public void onDraw(Canvas canvas) {
 	}
 	
 	private class BLPieCenterView extends View {

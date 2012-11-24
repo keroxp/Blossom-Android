@@ -36,7 +36,7 @@ public final class R {
     public static final class layout {
         public static final int input=0x7f030000;
         public static final int pie=0x7f030001;
-        public static final int popup=0x7f030002;
+        public static final int preview=0x7f030002;
     }
     public static final class raw {
         public static final int dictionary=0x7f050000;

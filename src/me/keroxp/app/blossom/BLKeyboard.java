@@ -111,14 +111,14 @@ public class BLKeyboard extends Keyboard {
         @Override
         public void onPressed(){
         	// ここでPieの表示を行う？
-        	Log.d("BLKeyboard.BLKey","key is pressed : " + this.codes);
+        //	Log.d("BLKeyboard.BLKey","key is pressed : " + this.codes);
         }
         
         // Changes the pressed state of the key.
         @Override
         public void onReleased(boolean inside){
         	// ここでPieの非表示を行う？
-        	Log.d("BLKeyboard.BLKey", "key is released : " + this.codes);
+        //	Log.d("BLKeyboard.BLKey", "key is released : " + this.codes);
         }
         
         // Pieのクラス。ここに書く意味があるのかは分からない
