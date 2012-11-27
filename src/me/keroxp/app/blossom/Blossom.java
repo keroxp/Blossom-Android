@@ -3,9 +3,18 @@
  * A Japanese text input system for Android
  * Developed by Yusuke Sakurai as Keio Univ SFC Masui Lab.
  */
+
 package me.keroxp.app.blossom;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.List;
+
+//import net.sf.json.*;
+import org.json.*;
 
 import android.inputmethodservice.InputMethodService;
 import android.view.inputmethod.CompletionInfo;
@@ -17,26 +26,27 @@ import android.view.inputmethod.InputMethodSubtype;
 import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
 import android.text.InputType;
+import android.text.StaticLayout;
 import android.text.method.MetaKeyKeyListener;
 
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager.LayoutParams;
 import android.widget.Button;
 import android.widget.PopupWindow;
+import android.widget.SimpleAdapter.ViewBinder;
 import android.util.Log;
-
-import android.widget.AbsoluteLayout; 
 
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.XmlResourceParser;
-import android.text.ClipboardManager;
 
-public final class Blossom extends InputMethodService implements KeyboardView.OnKeyboardActionListener  {
+@SuppressWarnings("deprecation")
+public final class Blossom extends InputMethodService implements KeyboardView.OnKeyboardActionListener, View.OnTouchListener  {
     
 	private InputMethodManager InputMethodManager;
 	private String WordSeparators;
@@ -47,25 +57,47 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 	private BLKeyboard currentKeyboard;
 	// KeyboardView
 	private BLKeyboardView keyboardView;
-	// Keyboardのイベントハンドラ
-	private BLKeyboardController keyboardController;
-	// 候補ビューとかパイビューもこいつが管理する必要がある？	
-    
+
 	private int mLastDisplayWidth;
-    
-	private PopupWindow popupWindow;
-    private BLPieView pieView;
+	
+	// バッファ
+	private StringBuilder originalBuffer;
+	private StringBuilder composedBuffer;
+	private StringBuilder romeBuffer;
+	
+	// 辞書
+	//private JSONObject keyDictionary; // Key
+	private JSONObject piecesDictionary;
+	private JSONObject romeDictionary; // ローマ字変換
+	private JSONObject fullHalfDictionary; // 半角全角変換
+	private JSONObject smallDictionary;  // 大文字小文字変換
     
 	/**
      * Main initialization of the input method component.  Be sure to call
      * to super class.
      */
+    
 	@Override public void onCreate(){
 		super.onCreate();	
 		// こいつが何なのかは分からない
         InputMethodManager = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
         // こいつもよく分からない
         WordSeparators = getResources().getString(R.string.word_separators);
+        
+		// 辞書を初期化
+        try {
+//			this.keyDictionary = this.getDictionary(R.raw.keydictionary);
+        	this.piecesDictionary = this.getDictionary(R.raw.pieces);
+			this.romeDictionary = this.getDictionary(R.raw.romakana);
+			this.fullHalfDictionary = this.getDictionary(R.raw.fullhalf);			
+			this.smallDictionary = this.getDictionary(R.raw.small);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 	
 	/**
@@ -82,19 +114,10 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
             if (displayWidth == mLastDisplayWidth) return;
             mLastDisplayWidth = displayWidth;
 		}
+		
 		// メインキーボードを作成
 		mainKeyboard = new BLKeyboard(this, R.xml.qwerty);
-		// イベント処理は全部コイツに投げる
-		keyboardController = new BLKeyboardController();	
-		
-		// Pie View
-		pieView = (BLPieView)getLayoutInflater().inflate(R.layout.pie, null);		
-		// Popup
-		popupWindow = new PopupWindow(pieView);
-//		popupWindow.setContentView(pieView);
-		popupWindow.setWindowLayoutMode(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-		popupWindow.setWidth(LayoutParams.WRAP_CONTENT);
-		popupWindow.setHeight(LayoutParams.WRAP_CONTENT);
+
 	}
 	
 	/**
@@ -126,13 +149,12 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 	@Override public View onCreateInputView() {
 		// レイアウトファイルからViewを作成。ファイルは res/layout/input.xml		
 		keyboardView = (BLKeyboardView) getLayoutInflater().inflate(R.layout.input, null);
-		// KeyboardViewのイベントハンドラを設定。ここではkeyboardControllerにメソッドを実装。
-		keyboardController = new BLKeyboardController();		
-        //keyboardView.setOnKeyboardActionListener(keyboardController);
+		// KeyboardViewのイベントリスナをこのクラスに
 		keyboardView.setOnKeyboardActionListener(this);
+		keyboardView.setOnTouchListener(this);
         // KeyboardViewにKeyboardをアサイン。
         keyboardView.setKeyboard(mainKeyboard);
-        // Previewをオフに
+        // Keyboardのプレビューをオフに
         keyboardView.setPreviewEnabled(false);
         return keyboardView;
 	}
@@ -147,8 +169,21 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
         //keyboardView.setSubtypeOnSpaceKey(subtype);
     }
 
+	// IMEによる入力が終わったときに呼ばれる。
     @Override public void onFinishInput() {
     	super.onFinishInput();
+        
+        // バッファをクリア
+    	//this.originalBuffer.setLength(0);
+    	//this.romeBuffer.setLength(0);
+    	//this.composedBuffer.setLength(0);
+        
+        // We only hide the candidates window when finishing input on
+        // a particular editor, to avoid _ping the underlying application
+        // up and down if the user is entering text into the bottom of
+        // its window.
+        setCandidatesViewShown(false);
+                
     	if (keyboardView != null) {
             keyboardView.closing();
         }
@@ -156,37 +191,43 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     
     @Override public boolean onKeyDown(int keyCode, KeyEvent keyEvent) {
     	Log.d("Blossom.onKeyDown","keyCode : " + keyCode + " KeyEvent : " + keyEvent);    
-    	List<Keyboard.Key> keys = mainKeyboard.getKeys();    	
     	// show Flower    	
-    	popupWindow.showAtLocation(keyboardView, Gravity.CENTER, 0, 0);
+    	//popupWindow.showAtLocation(keyboardView, Gravity.CENTER, 0, 0);
     	return super.onKeyDown(keyCode, keyEvent);
     }
     
     @Override public boolean onKeyUp(int keyCode, KeyEvent keyEvent) {
     	Log.d("Blossom.onKeyUp","keyCod : " + keyCode + " KeyEvent : " + keyEvent);    	
-    	popupWindow.dismiss();
+    	//popupWindow.dismiss();
     	return super.onKeyUp(keyCode, keyEvent);
     }
        
- // Keyが押されたら必ず呼ばれる
+    // Keyが押されたら必ず呼ばれる
  	public void onKey(int primaryCode, int[] keyCodes) {
  		// TODO Auto-generated method stub
- 		Log.d("BLKeyboardController.onKey", "onkey");
-    	popupWindow.showAtLocation(keyboardView, Gravity.NO_GRAVITY, 0, 0);
+ 		Log.d("BLossom.onKey", "onkey");
+    	//popupWindow.showAtLocation(keyboardView, Gravity.NO_GRAVITY, 0, 0);
  	}
  	// Keyが押されたとき、最初に一度だけ呼ばれる。Keyが連続された場合は呼ばれない。
  	// 順番的には onKeyの前に呼ばれる。
  	public void onPress(int primaryCode) {
  		// TODO Auto-generated method stub
- 		Log.d("BLKeyboardController.onPress","key did press : " + primaryCode); 		
+ 		Log.d("BLossom.onPress","key did press : " + primaryCode);	
+ 		try {
+			JSONArray pieces = this.piecesDictionary.getJSONArray(String.valueOf(primaryCode));
+			Log.d("Blossom.onPress", pieces.toString());
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();		
+		} 		
  	}
  	
  	// Keyが離されたら呼ばれる。
  	// 順番的には onKeyの後に呼ばれる
  	public void onRelease(int primaryCode) {
  		// TODO Auto-generated method stub
- 		Log.d("BLKeyboardController.onRelease","key did release : " + primaryCode);
-    	popupWindow.dismiss();
+ 		Log.d("BLossom.onRelease","key did release : " + primaryCode);
+    	//popupWindow.dismiss();
  	}
 
  	public void onText(CharSequence text) {
@@ -195,22 +236,45 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
  	}
 
  	public void swipeDown() {
- 		// TODO Auto-generated method stub
- 		Log.d("BLKeyboardController.swipeDown", "swipe down");
+ 		Log.d("BLossom.swipeDown", "swipe down");
  	}
 
  	public void swipeLeft() {
- 		// TODO Auto-generated method stub
- 		Log.d("BLKeyboardController.swipeLeft","swipe left");
+ 		Log.d("BLossom.swipeLeft","swipe left");
  	}
 
  	public void swipeRight() {
- 		// TODO Auto-generated method stub
- 		Log.d("BLKeyboardController.swipeRight", "swipe right");
+ 		Log.d("BLossom.swipeRight", "swipe right");
  	}
 
  	public void swipeUp() {
- 		// TODO Auto-generated method stub
- 		Log.d("BLKeyboardController.swipeUp","swipe up");
+ 		Log.d("BLossom.swipeUp","swipe up");
+ 	} 	
+ 	
+ 	// res/rawのjsonファイルからJSONObectを返すメソッド
+ 	private JSONObject getDictionary(int res) throws IOException, JSONException {
+ 		BufferedReader bufferedReader = null;
+ 		try {
+ 			InputStream inStream = getResources().openRawResource(res);
+ 			BufferedInputStream bufferedStream = new BufferedInputStream(inStream);
+ 			InputStreamReader reader = new InputStreamReader(bufferedStream);
+ 			bufferedReader = new BufferedReader(reader);
+ 			StringBuilder builder = new StringBuilder();
+ 			String line = bufferedReader.readLine();
+ 			while (line != null) {
+ 				builder.append(line);
+ 				line = bufferedReader.readLine();
+ 			}
+ 			return new JSONObject(builder.toString());
+ 		} finally {
+ 			if (bufferedReader != null) {
+ 				bufferedReader.close();
+ 			}
+ 		}
  	}
+
+	public boolean onTouch(View v, MotionEvent event) {
+		// TODO Auto-generated method stub
+		return false;
+	}
 }

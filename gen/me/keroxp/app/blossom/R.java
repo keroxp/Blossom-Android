@@ -37,7 +37,11 @@ public final class R {
         public static final int preview=0x7f030002;
     }
     public static final class raw {
-        public static final int dictionary=0x7f050000;
+        public static final int fullhalf=0x7f050000;
+        public static final int keydictionary=0x7f050001;
+        public static final int pieces=0x7f050002;
+        public static final int romakana=0x7f050003;
+        public static final int small=0x7f050004;
     }
     public static final class string {
         public static final int blossom_settings=0x7f070001;
