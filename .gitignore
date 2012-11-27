@@ -1,0 +1,5 @@
+gen/*
+
+.settings/*
+/.DS_Store
+/.project
