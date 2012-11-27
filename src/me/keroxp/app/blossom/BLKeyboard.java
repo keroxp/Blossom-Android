@@ -14,8 +14,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import me.keroxp.app.blossom.BLPieView;
-
 import android.R.anim;
 import android.R.integer;
 import android.content.Context;
@@ -51,21 +49,7 @@ public class BLKeyboard extends Keyboard {
     
     @Override
     protected Key createKeyFromXml(Resources res, Row parent, int x, int y, XmlResourceParser parser) {
-        Key key = new Key(res, parent, x, y, parser);
-        // JSONからPieceをセット
-        
-        /*
-        try {
-			JSONArray jArray = mBlossom.getKeyDictionary().getJSONObject(String.valueOf((char)key.codes[0])).getJSONArray("pieces");
-			if(jArray != null) {
-				key.setPieces(jArray);
-				android.util.Log.d("BLKey",(String)jArray.toString(4));
-			}
-		} catch (JSONException e) {
-			e.printStackTrace();
-			android.util.Log.d("BLkey:error", (String)key.label);
-		}
-		*/
+        BLKey key = new BLKey(res, parent, x, y, parser);
         
         if (key.codes[0] == 10) {
             mEnterKey = key;
@@ -141,19 +125,14 @@ public class BLKeyboard extends Keyboard {
         
         // Informs the key that it has been pressed, in case it needs to change its appearance or state.
         @Override
-        public void onPressed(){
-        	super.onPressed();        	
-        	// ここでPieの表示を行う？        	
-        	//BLPieView pieView = ((Activity)this.getContext()).getLayoutInflater().inflate(R.layout.pieview, null);        	
-        //	Log.d("BLKeyboard.BLKey","key is pressed : " + this.codes);
-        }
+        public void onPressed(){        
+        	super.onPressed(); 	
+        }               
         
         // Changes the pressed state of the key.
         @Override
         public void onReleased(boolean inside){
         	super.onReleased(inside);
-        	// ここでPieの非表示を行う？
-        //	Log.d("BLKeyboard.BLKey", "key is released : " + this.codes);
         }
 
 		public JSONArray getPieces() {
