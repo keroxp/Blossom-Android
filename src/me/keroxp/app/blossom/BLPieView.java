@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.Writer;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -15,7 +14,6 @@ import android.graphics.Canvas;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
-import android.widget.PopupWindow;
 import android.widget.TextView;
 
 /*
@@ -33,7 +31,7 @@ public class BLPieView extends View{
 	private View[] pieceViews;
 	
 	public BLPieView(Context context, AttributeSet attr) {
-		super(context, attr);
+		super(context, attr);			
 	}
 	
 	// メインコンストラクタ
@@ -66,7 +64,7 @@ public class BLPieView extends View{
 	
 	@Override
 	protected void onMeasure (int widthMeasureSpec, int heightMeasureSpec) {
-		
+		setMeasuredDimension(widthMeasureSpec, heightMeasureSpec);
 	}
 	
 	// ピースの選択状態を変えるメソッド

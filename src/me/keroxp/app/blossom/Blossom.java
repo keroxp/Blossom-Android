@@ -5,6 +5,8 @@
  */
 package me.keroxp.app.blossom;
 
+import java.util.List;
+
 import android.inputmethodservice.InputMethodService;
 import android.view.inputmethod.CompletionInfo;
 import android.view.inputmethod.EditorInfo;
@@ -18,10 +20,13 @@ import android.text.InputType;
 import android.text.method.MetaKeyKeyListener;
 
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.WindowManager.LayoutParams;
 import android.widget.Button;
+import android.widget.PopupWindow;
 import android.util.Log;
 
 import android.widget.AbsoluteLayout; 
@@ -31,7 +36,7 @@ import android.content.res.Resources;
 import android.content.res.XmlResourceParser;
 import android.text.ClipboardManager;
 
-public final class Blossom extends InputMethodService {
+public final class Blossom extends InputMethodService implements KeyboardView.OnKeyboardActionListener  {
     
 	private InputMethodManager InputMethodManager;
 	private String WordSeparators;
@@ -44,9 +49,12 @@ public final class Blossom extends InputMethodService {
 	private BLKeyboardView keyboardView;
 	// Keyboardのイベントハンドラ
 	private BLKeyboardController keyboardController;
-	// 候補ビューとかパイビューもこいつが管理する必要がある？
-	
-    private int mLastDisplayWidth;
+	// 候補ビューとかパイビューもこいつが管理する必要がある？	
+    
+	private int mLastDisplayWidth;
+    
+	private PopupWindow popupWindow;
+    private BLPieView pieView;
     
 	/**
      * Main initialization of the input method component.  Be sure to call
@@ -65,6 +73,7 @@ public final class Blossom extends InputMethodService {
      * is called after creation and any configuration change.
      */
 	@Override public void onInitializeInterface () {
+		
 		if(mainKeyboard != null){
 			// Configuration changes can happen after the keyboard gets recreated,
             // so we need to be able to re-build the keyboards if the available
@@ -76,7 +85,16 @@ public final class Blossom extends InputMethodService {
 		// メインキーボードを作成
 		mainKeyboard = new BLKeyboard(this, R.xml.qwerty);
 		// イベント処理は全部コイツに投げる
-		keyboardController = new BLKeyboardController();
+		keyboardController = new BLKeyboardController();	
+		
+		// Pie View
+		pieView = (BLPieView)getLayoutInflater().inflate(R.layout.pie, null);		
+		// Popup
+		popupWindow = new PopupWindow(pieView);
+//		popupWindow.setContentView(pieView);
+		popupWindow.setWindowLayoutMode(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+		popupWindow.setWidth(LayoutParams.WRAP_CONTENT);
+		popupWindow.setHeight(LayoutParams.WRAP_CONTENT);
 	}
 	
 	/**
@@ -110,7 +128,8 @@ public final class Blossom extends InputMethodService {
 		keyboardView = (BLKeyboardView) getLayoutInflater().inflate(R.layout.input, null);
 		// KeyboardViewのイベントハンドラを設定。ここではkeyboardControllerにメソッドを実装。
 		keyboardController = new BLKeyboardController();		
-        keyboardView.setOnKeyboardActionListener(keyboardController);        
+        //keyboardView.setOnKeyboardActionListener(keyboardController);
+		keyboardView.setOnKeyboardActionListener(this);
         // KeyboardViewにKeyboardをアサイン。
         keyboardView.setKeyboard(mainKeyboard);
         // Previewをオフに
@@ -136,13 +155,62 @@ public final class Blossom extends InputMethodService {
     }
     
     @Override public boolean onKeyDown(int keyCode, KeyEvent keyEvent) {
-    	Log.d("Blossom.onKeyDown","keyCod : " + keyCode + " KeyEvent : " + keyEvent);
-    	return true;
+    	Log.d("Blossom.onKeyDown","keyCode : " + keyCode + " KeyEvent : " + keyEvent);    
+    	List<Keyboard.Key> keys = mainKeyboard.getKeys();    	
+    	// show Flower    	
+    	popupWindow.showAtLocation(keyboardView, Gravity.CENTER, 0, 0);
+    	return super.onKeyDown(keyCode, keyEvent);
     }
     
     @Override public boolean onKeyUp(int keyCode, KeyEvent keyEvent) {
-    	Log.d("Blossom.onKeyUp","keyCod : " + keyCode + " KeyEvent : " + keyEvent);
-    	return true;
+    	Log.d("Blossom.onKeyUp","keyCod : " + keyCode + " KeyEvent : " + keyEvent);    	
+    	popupWindow.dismiss();
+    	return super.onKeyUp(keyCode, keyEvent);
     }
        
+ // Keyが押されたら必ず呼ばれる
+ 	public void onKey(int primaryCode, int[] keyCodes) {
+ 		// TODO Auto-generated method stub
+ 		Log.d("BLKeyboardController.onKey", "onkey");
+    	popupWindow.showAtLocation(keyboardView, Gravity.NO_GRAVITY, 0, 0);
+ 	}
+ 	// Keyが押されたとき、最初に一度だけ呼ばれる。Keyが連続された場合は呼ばれない。
+ 	// 順番的には onKeyの前に呼ばれる。
+ 	public void onPress(int primaryCode) {
+ 		// TODO Auto-generated method stub
+ 		Log.d("BLKeyboardController.onPress","key did press : " + primaryCode); 		
+ 	}
+ 	
+ 	// Keyが離されたら呼ばれる。
+ 	// 順番的には onKeyの後に呼ばれる
+ 	public void onRelease(int primaryCode) {
+ 		// TODO Auto-generated method stub
+ 		Log.d("BLKeyboardController.onRelease","key did release : " + primaryCode);
+    	popupWindow.dismiss();
+ 	}
+
+ 	public void onText(CharSequence text) {
+ 		// TODO Auto-generated method stub
+ 		
+ 	}
+
+ 	public void swipeDown() {
+ 		// TODO Auto-generated method stub
+ 		Log.d("BLKeyboardController.swipeDown", "swipe down");
+ 	}
+
+ 	public void swipeLeft() {
+ 		// TODO Auto-generated method stub
+ 		Log.d("BLKeyboardController.swipeLeft","swipe left");
+ 	}
+
+ 	public void swipeRight() {
+ 		// TODO Auto-generated method stub
+ 		Log.d("BLKeyboardController.swipeRight", "swipe right");
+ 	}
+
+ 	public void swipeUp() {
+ 		// TODO Auto-generated method stub
+ 		Log.d("BLKeyboardController.swipeUp","swipe up");
+ 	}
 }

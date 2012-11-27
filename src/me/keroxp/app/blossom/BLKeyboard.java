@@ -7,6 +7,8 @@
  */
 package me.keroxp.app.blossom;
 
+import me.keroxp.app.blossom.BLPieView;
+
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.XmlResourceParser;
@@ -88,9 +90,9 @@ public class BLKeyboard extends Keyboard {
     }
     
     static class BLKey extends Keyboard.Key {    
-        //BLPie pie;
+        //BLPie pie;a    
         Boolean isMetaKey;
-        public BLKey(Resources res, Keyboard.Row parent, int x, int y, XmlResourceParser parser) {
+        BLKey(Resources res, Keyboard.Row parent, int x, int y, XmlResourceParser parser) {
             super(res, parent, x, y, parser);                             	
         }
         
@@ -108,18 +110,21 @@ public class BLKeyboard extends Keyboard {
         }
         
         // Informs the key that it has been pressed, in case it needs to change its appearance or state.
-        @Override
-        public void onPressed(){
-        	// ここでPieの表示を行う？
+        //@Override
+        //public void onPressed(){
+        	//super.onPressed();        	
+        	// ここでPieの表示を行う？        	
+        	//BLPieView pieView = ((Activity)this.getContext()).getLayoutInflater().inflate(R.layout.pieview, null);        	
         //	Log.d("BLKeyboard.BLKey","key is pressed : " + this.codes);
-        }
+        //}
         
         // Changes the pressed state of the key.
-        @Override
-        public void onReleased(boolean inside){
+        //@Override
+        //public void onReleased(boolean inside){
+        	//super.onReleased(inside);
         	// ここでPieの非表示を行う？
         //	Log.d("BLKeyboard.BLKey", "key is released : " + this.codes);
-        }
+        //}
         
         // Pieのクラス。ここに書く意味があるのかは分からない
         /*
