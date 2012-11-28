@@ -3,6 +3,10 @@
  */
 package me.keroxp.app.blossom;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+
+import android.R.string;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
@@ -27,18 +31,25 @@ public class BLKeyboardView extends KeyboardView {
 
 	// Flower表示のためのPopupWindow
 	private PopupWindow popupWindow;
-
 	public PopupWindow getPopupWindow() {
 		return popupWindow;
 	}
 
 	// FlowerのViewGroup
 	private RelativeLayout flowerLayout;
-
 	public RelativeLayout getFlowerLayout() {
 		return flowerLayout;
 	}
-
+	
+	// 表示用のPieceArray
+	private JSONArray piecesArray;
+	public JSONArray getPiecesArray() {
+		return piecesArray;
+	}
+	public void setPiecesArray(JSONArray piecesArray) {
+		this.piecesArray = piecesArray;
+	}
+	
 	// 親のBlossomオブジェクト
 	private Blossom mBlossom;
 
@@ -57,9 +68,7 @@ public class BLKeyboardView extends KeyboardView {
 	@Override
 	public void onDraw(android.graphics.Canvas canvas) {
 		super.onDraw(canvas);
-		// PopupWindowのサイズをキーボードの40%に変更
-		Log.d("BLKeyboardView.makePopupWindow",
-				String.valueOf(this.getMeasuredWidth()));
+		// PopupWindowのサイズをキーボードの40%に変更		
 		this.popupWindow.setWidth(this.getMeasuredWidth() * 4 / 10);
 		this.popupWindow.setHeight(this.getMeasuredWidth() * 4 / 10);
 	}
@@ -77,6 +86,19 @@ public class BLKeyboardView extends KeyboardView {
 	}
 
 	public void showPopupWindow(int x, int y) {
+		JSONArray ps = this.getPiecesArray();
+		RelativeLayout fl = this.getFlowerLayout();		
+		for (int i = 0; i < ps.length(); i++) {
+			TextView tView = (TextView)fl.getChildAt(i+1);
+			String pString;
+			try {
+				pString = ps.getString(i);
+				tView.setText(pString);
+			} catch (JSONException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}		
+		}
 		if (popupWindow.isShowing()) {
 			// 表示中だったら場所を更新
 			View v = popupWindow.getContentView();

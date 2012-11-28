@@ -49,8 +49,8 @@ public class BLKeyboard extends Keyboard {
     
     @Override
     protected Key createKeyFromXml(Resources res, Row parent, int x, int y, XmlResourceParser parser) {
-        BLKey key = new BLKey(res, parent, x, y, parser);
-        
+    	// Keyオブジェクトをインスタンス化
+    	BLKey key = new BLKey(res, parent, x, y, parser);    	
         if (key.codes[0] == 10) {
             mEnterKey = key;
         } else if (key.codes[0] == ' ') {
@@ -107,6 +107,21 @@ public class BLKeyboard extends Keyboard {
         // メタキーか否か
         private Boolean metaKey;
         
+        private OnKeyActionListener onKeyActionListener;
+        
+        public OnKeyActionListener getOnKeyActionListener() {
+			return onKeyActionListener;
+		}
+
+		public void setOnKeyActionListener(OnKeyActionListener onKeyActionListener) {
+			this.onKeyActionListener = onKeyActionListener;
+		}
+
+		public interface OnKeyActionListener {
+        	void keyDidPress(BLKey key);
+        	void keyDidRelease(BLKey key, Boolean inside);
+        }
+        
         public BLKey(Resources res, Keyboard.Row parent, int x, int y, XmlResourceParser parser) {
             super(res, parent, x, y, parser);
         }              
@@ -126,13 +141,22 @@ public class BLKeyboard extends Keyboard {
         // Informs the key that it has been pressed, in case it needs to change its appearance or state.
         @Override
         public void onPressed(){        
-        	super.onPressed(); 	
+        	// 別クラスにDelegate
+        
+        	if (this.getOnKeyActionListener() != null) {
+				this.getOnKeyActionListener().keyDidPress(this);
+			}else{
+				Log.v("BLKey.Onpress", "onpress");
+			}
         }               
         
         // Changes the pressed state of the key.
         @Override
         public void onReleased(boolean inside){
-        	super.onReleased(inside);
+        	// Delegate
+        	if (this.getOnKeyActionListener() != null) {
+				this.getOnKeyActionListener().keyDidRelease(this, inside);
+			}
         }
 
 		public JSONArray getPieces() {
@@ -141,7 +165,8 @@ public class BLKeyboard extends Keyboard {
 
 		public void setPieces(JSONArray pieces) {
 			this.pieces = pieces;
-		}                                               
+		}
+	                                         
     }
     
     // 数字キー
