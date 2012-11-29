@@ -41,20 +41,9 @@ import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.WindowManager.LayoutParams;
-import android.widget.Button;
-import android.widget.PopupWindow;
 import android.widget.SimpleAdapter.ViewBinder;
-import android.widget.TextView;
 import android.util.Log;
 
-import android.content.Context;
-import android.content.res.Resources;
-import android.content.res.XmlResourceParser;
-
-import android.app.*;
-
-@SuppressWarnings("deprecation")
 public final class Blossom extends InputMethodService implements
 		KeyboardView.OnKeyboardActionListener, View.OnTouchListener,
 		BLKeyboard.BLKey.OnKeyActionListener, OnGestureListener, OnDoubleTapListener {
@@ -67,12 +56,13 @@ public final class Blossom extends InputMethodService implements
 	private GestureDetector gestureDetector;
 
 	// Keyboardオブジェクト
-	private BLKeyboard mainKeyboard;
-	// 現在のKeyboardオブジェクト
-	private BLKeyboard currentKeyboard;
-	// KeyboardView
+	private BLKeyboard mainKeyboard; // メイン
+	private BLKeyboard currentKeyboard; // 現在のKeyboard
+	
+	// KeyboardViewオブジェクト
 	private BLKeyboardView keyboardView;
 
+	// なんだろこれ
 	private int mLastDisplayWidth;
 
 	// バッファ
@@ -81,7 +71,6 @@ public final class Blossom extends InputMethodService implements
 	private StringBuilder romeBuffer = new StringBuilder(); // （i.e i）
 
 	// 辞書
-	// private JSONObject keyDictionary; // Key
 	private JSONObject piecesDictionary; // ピース対応表
 	private JSONObject romeDictionary; // ローマ字変換
 	private JSONObject fullHalfDictionary; // 半角全角変換
@@ -352,6 +341,7 @@ public final class Blossom extends InputMethodService implements
 		if (!this.keyboardView.getPopupWindow().isShowing()) {
 			// Piecesをセット
 			this.keyboardView.setPiecesArray(piecesArray);
+			this.keyboardView.getFlowerLayout().hilightPiece(0);
 			// 表示
 			this.keyboardView.showPopupWindow(0,
 					-this.keyboardView.getMeasuredHeight());			
