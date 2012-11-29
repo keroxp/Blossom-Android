@@ -79,10 +79,10 @@ public class BLKeyboardView extends KeyboardView {
 		// PopupWindowを構築
 		this.popupWindow = new PopupWindow(context);
 		// FlowerLayoutをLayoutファイルから作成
-		this.flowerLayout = (BLFlowerLayout) this.mBlossom.getLayoutInflater().inflate(R.layout.flower, null);
+		this.flowerLayout = (BLFlowerLayout) this.mBlossom.getLayoutInflater().inflate(R.layout.flower, null);		
 		// PopupWindowにセット
 		popupWindow.setContentView(this.flowerLayout);
-		popupWindow.setWindowLayoutMode(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+		popupWindow.setWindowLayoutMode(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);	
 		popupWindow.setBackgroundDrawable(null);
 	}
 

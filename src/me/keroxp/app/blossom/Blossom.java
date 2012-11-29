@@ -44,9 +44,8 @@ import android.view.View;
 import android.widget.SimpleAdapter.ViewBinder;
 import android.util.Log;
 
-public final class Blossom extends InputMethodService implements
-		KeyboardView.OnKeyboardActionListener, View.OnTouchListener,
-		BLKeyboard.BLKey.OnKeyActionListener, OnGestureListener, OnDoubleTapListener {
+public final class Blossom extends InputMethodService implements KeyboardView.OnKeyboardActionListener,
+		View.OnTouchListener, BLKeyboard.BLKey.OnKeyActionListener, OnGestureListener, OnDoubleTapListener {
 
 	// おまじないオブジェクト
 	private InputMethodManager InputMethodManager;
@@ -58,7 +57,7 @@ public final class Blossom extends InputMethodService implements
 	// Keyboardオブジェクト
 	private BLKeyboard mainKeyboard; // メイン
 	private BLKeyboard currentKeyboard; // 現在のKeyboard
-	
+
 	// KeyboardViewオブジェクト
 	private BLKeyboardView keyboardView;
 
@@ -66,9 +65,9 @@ public final class Blossom extends InputMethodService implements
 	private int mLastDisplayWidth;
 
 	// バッファ
-	private StringBuilder originalBuffer = new StringBuilder(); // 生バッファ (i.e あiueo）
-	private StringBuilder composedBuffer = new StringBuilder(); // 変換後バッファ (i.e あいうえお）
-	private StringBuilder romeBuffer = new StringBuilder(); // （i.e i）
+	private StringBuilder originalBuffer = new StringBuilder(); // 生バッファ(あiueo）
+	private StringBuilder composedBuffer = new StringBuilder(); // 変換後バッファ(あいうえお）
+	private StringBuilder romeBuffer = new StringBuilder(); // (i.e i）
 
 	// 辞書
 	private JSONObject piecesDictionary; // ピース対応表
@@ -78,6 +77,10 @@ public final class Blossom extends InputMethodService implements
 
 	// 遷移処理
 	Boolean touching;
+	
+	// 現在のフリック方向
+	int currentFlickDirection = -1;
+	JSONArray currentPiecesArray;
 
 	/**
 	 * Main initialization of the input method component. Be sure to call to
@@ -94,7 +97,7 @@ public final class Blossom extends InputMethodService implements
 		// ジェスチャディテクタを初期化
 		gestureDetector = new GestureDetector(this, this);
 		gestureDetector.setOnDoubleTapListener(this);
-		
+
 		// 辞書を初期化
 		try {
 			this.piecesDictionary = this.getDictionary(R.raw.pieces);
@@ -117,8 +120,7 @@ public final class Blossom extends InputMethodService implements
 		BufferedReader bufferedReader = null;
 		try {
 			InputStream inStream = getResources().openRawResource(res);
-			BufferedInputStream bufferedStream = new BufferedInputStream(
-					inStream);
+			BufferedInputStream bufferedStream = new BufferedInputStream(inStream);
 			InputStreamReader reader = new InputStreamReader(bufferedStream);
 			bufferedReader = new BufferedReader(reader);
 			StringBuilder builder = new StringBuilder();
@@ -134,45 +136,43 @@ public final class Blossom extends InputMethodService implements
 			}
 		}
 	}
-	
+
 	/**
-     * Helper to determine if a given character code is alphabetic.
-     */
-    private boolean isAlphabet(int code) {
-        if (Character.isLetter(code)) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-    
-    /**
-     * Helper to send a key down / key up pair to the current editor.
-     */
-    private void keyDownUp(int keyEventCode) {
-        getCurrentInputConnection().sendKeyEvent(
-                new KeyEvent(KeyEvent.ACTION_DOWN, keyEventCode));
-        getCurrentInputConnection().sendKeyEvent(
-                new KeyEvent(KeyEvent.ACTION_UP, keyEventCode));
-    }
-    
-    /**
-     * Helper to send a character to the editor as raw key events.
-     */
-    private void sendKey(int keyCode) {
-        switch (keyCode) {
-            case '\n':
-                keyDownUp(KeyEvent.KEYCODE_ENTER);
-                break;
-            default:
-                if (keyCode >= '0' && keyCode <= '9') {
-                    keyDownUp(keyCode - '0' + KeyEvent.KEYCODE_0);
-                } else {
-                    getCurrentInputConnection().commitText(String.valueOf((char) keyCode), 1);
-                }
-                break;
-        }
-    }
+	 * Helper to determine if a given character code is alphabetic.
+	 */
+	private boolean isAlphabet(int code) {
+		if (Character.isLetter(code)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/**
+	 * Helper to send a key down / key up pair to the current editor.
+	 */
+	private void keyDownUp(int keyEventCode) {
+		getCurrentInputConnection().sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, keyEventCode));
+		getCurrentInputConnection().sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, keyEventCode));
+	}
+
+	/**
+	 * Helper to send a character to the editor as raw key events.
+	 */
+	private void sendKey(int keyCode) {
+		switch (keyCode) {
+		case '\n':
+			keyDownUp(KeyEvent.KEYCODE_ENTER);
+			break;
+		default:
+			if (keyCode >= '0' && keyCode <= '9') {
+				keyDownUp(keyCode - '0' + KeyEvent.KEYCODE_0);
+			} else {
+				getCurrentInputConnection().commitText(String.valueOf((char) keyCode), 1);
+			}
+			break;
+		}
+	}
 
 	/**
 	 * This is the point where you can do all of your UI initialization. It is
@@ -220,7 +220,7 @@ public final class Blossom extends InputMethodService implements
 	 */
 	@Override
 	public void onStartInput(EditorInfo attribute, boolean restarting) {
-		super.onStartInput(attribute, restarting);		
+		super.onStartInput(attribute, restarting);
 		// バッファを初期化
 		this.originalBuffer.setLength(0);
 		this.composedBuffer.setLength(0);
@@ -236,8 +236,7 @@ public final class Blossom extends InputMethodService implements
 	@Override
 	public View onCreateInputView() {
 		// レイアウトファイルからViewを作成。ファイルは res/layout/input.xml
-		keyboardView = (BLKeyboardView) getLayoutInflater().inflate(
-				R.layout.input, null);
+		keyboardView = (BLKeyboardView) getLayoutInflater().inflate(R.layout.input, null);
 		// KeyboardViewのイベントリスナをこのクラスに
 		keyboardView.setOnKeyboardActionListener(this);
 		keyboardView.setOnTouchListener(this);
@@ -283,25 +282,15 @@ public final class Blossom extends InputMethodService implements
 
 	@Override
 	public boolean onKeyDown(int keyCode, KeyEvent keyEvent) {
-		Log.d("Blossom.onKeyDown", "keyCode : " + keyCode + " KeyEvent : "
-				+ keyEvent);
+		Log.d("Blossom.onKeyDown", "keyCode : " + keyCode + " KeyEvent : " + keyEvent);
 		return super.onKeyDown(keyCode, keyEvent);
 	}
 
 	@Override
 	public boolean onKeyUp(int keyCode, KeyEvent keyEvent) {
-		Log.d("Blossom.onKeyUp", "keyCod : " + keyCode + " KeyEvent : "
-				+ keyEvent);
+		Log.d("Blossom.onKeyUp", "keyCod : " + keyCode + " KeyEvent : " + keyEvent);
 		return super.onKeyUp(keyCode, keyEvent);
 	}
-
-	/*
-	 * KeyboardView.OnKeyboardActionListener
-	 * 
-	 * @see
-	 * android.inputmethodservice.KeyboardView.OnKeyboardActionListener#onKey
-	 * (int, int[])
-	 */
 
 	// Keyが押されたら必ず呼ばれる。KeyがRepeatableの場合連続して呼ばれる
 	public void onKey(int primaryCode, int[] keyCodes) {
@@ -315,23 +304,13 @@ public final class Blossom extends InputMethodService implements
 			break;
 		}
 	}
-	
-	/*
-	 * BLKeyboard.BLKey.OnKeyActionListener
-	 * ↑のonKeyPressとかだと詳細なkey情報がでないのでこっちでバインドする
-	 * 
-	 * @see
-	 * me.keroxp.app.blossom.BLKeyboard.BLKey.OnKeyActionListener#keyDidPress
-	 * (me.keroxp.app.blossom.BLKeyboard.BLKey)
-	 */
 
 	public void keyDidPress(BLKey key) {
-		Log.d("BLKeyboard.OnKeyActionListener",
-				"key did press : " + String.valueOf(key.codes[0]));
-		JSONArray piecesArray = null;		
+		// Log.d("BLKeyboard.OnKeyActionListener", "key did press : " +
+		// String.valueOf(key.codes[0]));
+		JSONArray piecesArray = null;
 		try {
-			piecesArray = this.piecesDictionary.getJSONArray(String
-					.valueOf(key.codes[0]));
+			piecesArray = this.piecesDictionary.getJSONArray(String.valueOf(key.codes[0]));
 			Log.d("Blossom.onPress", piecesArray.toString());
 		} catch (JSONException e) {
 			// TODO Auto-generated catch block
@@ -341,21 +320,38 @@ public final class Blossom extends InputMethodService implements
 		if (!this.keyboardView.getPopupWindow().isShowing()) {
 			// Piecesをセット
 			this.keyboardView.setPiecesArray(piecesArray);
-			this.keyboardView.getFlowerLayout().hilightPiece(0);
 			// 表示
-			this.keyboardView.showPopupWindow(0,
-					-this.keyboardView.getMeasuredHeight());			
+			this.keyboardView.showPopupWindow(0, -this.keyboardView.getMeasuredHeight());
 		}
+		currentPiecesArray = piecesArray;
 		// キャラクタなら入力
 		if (key.codes[0] < 300) {
-			getCurrentInputConnection().commitText(key.label, 0);
+			//getCurrentInputConnection().commitText(key.label, 0);
 		}
 	}
 
 	public void keyDidRelease(BLKey key, Boolean inside) {
 		// TODO Auto-generated method stub
-		Log.d("BLKeyboard.OnKeyActionListener",
-				"key did Release : " + String.valueOf(key.codes[0]));
+		Log.d("BLKeyboard.OnKeyActionListener", "key did Release : " + String.valueOf(key.codes[0]));
+		if (currentFlickDirection > -1) {
+			if (currentPiecesArray != null) {
+				String s;
+				try {
+					s = currentPiecesArray.getString(currentFlickDirection);
+					getCurrentInputConnection().commitText(s, 0);					
+				} catch (JSONException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}				
+				currentPiecesArray = null;
+				currentFlickDirection = -1;
+			}
+		}else{
+			// キャラクタなら入力
+			if (key.codes[0] < 300) {
+				getCurrentInputConnection().commitText(key.label, 0);
+			}
+		}
 		this.keyboardView.dismissPopupWindow();
 	}
 
@@ -387,8 +383,8 @@ public final class Blossom extends InputMethodService implements
 
 	public void swipeUp() {
 		// 使わない
-	}	
-	
+	}
+
 	/*
 	 * View.OnTouchListener keyboardView上でのタッチイベントはすべてここでバインドする
 	 * Action一覧とかはここにある。ありすぎる。
@@ -413,6 +409,7 @@ public final class Blossom extends InputMethodService implements
 	 * GestureDetector.OnGestureListener
 	 * KeyboardView.OnTouchListenerからMotionEventを受け取って抽象的なモーションを判別してくれる
 	 * バインドしたらtrueを返す。でもその場合はそれ以外のMotionEventのリスナとかkeyDidReleaseとかが呼ばれないので注意。
+	 * 
 	 * @see android.view.GestureDetector.OnGestureListener#onDown(android.view.
 	 * MotionEvent)
 	 */
@@ -424,27 +421,65 @@ public final class Blossom extends InputMethodService implements
 		return false;
 	}
 
-	public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX,
-			float velocityY) {
+	public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
 		// TODO Auto-generated method stub
 		int THRESHOLD = 10;
 		if (Math.abs(e2.getX() - e1.getX()) > THRESHOLD) {
 			Log.v("onFling", "fling");
-            return false;
-		}		
+			return false;
+		}
 		return false;
 	}
 
 	public void onLongPress(MotionEvent e) {
 		// TODO Auto-generated method stub
-		Log.v("onLongPress", "longpress");		
+		Log.v("onLongPress", "longpress");
 	}
 
-	public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX,
-			float distanceY) {
-		// TODO Auto-generated method stub
+	public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
 		Log.v("onScroll", "scroll");
-		return false;
+		int dir = getDirection(e2.getRawX(), e2.getRawY(), e1.getRawX(), e1.getRawY());
+		keyboardView.getFlowerLayout().hilightPiece(dir);
+		currentFlickDirection = dir;
+		return true;
+	}
+
+	// MotionEventから方向を取得するメソッド
+
+	final int BLDirectionUp = 0;
+	final int BLDirectionUpRight = 1;
+	final int BLDirectionDownRight = 2;
+	final int BLDirectionDownLeft = 3;
+	final int BLDirectionUpLeft = 4;
+
+	private int getDirection(float f, float g, float h, float i) {
+		float dx = f - h;
+		float dy = g - i;
+		double angle = -Math.atan2(dy, dx);
+		double PI = Math.PI;
+
+		if (angle < 0)
+			angle += PI * 2;
+
+		if ((0 <= angle && angle < PI * 3 / 10) || (PI * 19 / 10 <= angle && angle <= PI * 2)) {
+			// 右上
+			return BLDirectionUpRight;
+		} else if (PI * 3 / 10 <= angle && angle < PI * 7 / 10) {
+			// 上
+			return BLDirectionUp;
+		} else if (PI * 7 / 10 <= angle && angle < PI * 11 / 10) {
+			// 左上
+			return BLDirectionUpLeft;
+		} else if (PI * 11 / 10 <= angle && angle < PI * 15 / 10) {
+			// 左下
+			return BLDirectionDownLeft;
+		} else if (PI * 15 / 10 <= angle && angle < PI * 19 / 10) {
+			// 右下
+			return BLDirectionDownRight;
+		} else {
+			Log.d("getDirction", "invalid angel " + String.valueOf(angle));
+		}
+		return -1;
 	}
 
 	public void onShowPress(MotionEvent e) {
@@ -475,20 +510,20 @@ public final class Blossom extends InputMethodService implements
 		Log.v("onSingleTapConfirmed", "singletapConirmed");
 		return false;
 	}
-	
+
 	private void handleBackspace() {
-        final int length = this.composedBuffer.length();
-        if (length > 1) {
-        	this.composedBuffer.delete(length - 1, length);
-            getCurrentInputConnection().setComposingText(this.composedBuffer, 1);
-            //updateCandidates();
-        } else if (length > 0) {
-            this.composedBuffer.setLength(0);
-            getCurrentInputConnection().commitText("", 0);
-            //updateCandidates();
-        } else {
-            keyDownUp(KeyEvent.KEYCODE_DEL);
-        }
-        //updateShiftKeyState(getCurrentInputEditorInfo());
-    }
+		final int length = this.composedBuffer.length();
+		if (length > 1) {
+			this.composedBuffer.delete(length - 1, length);
+			getCurrentInputConnection().setComposingText(this.composedBuffer, 1);
+			// updateCandidates();
+		} else if (length > 0) {
+			this.composedBuffer.setLength(0);
+			getCurrentInputConnection().commitText("", 0);
+			// updateCandidates();
+		} else {
+			keyDownUp(KeyEvent.KEYCODE_DEL);
+		}
+		// updateShiftKeyState(getCurrentInputEditorInfo());
+	}
 }
