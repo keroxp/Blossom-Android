@@ -4,26 +4,34 @@
     android:versionCode="1"
     android:versionName="1.0" >
 
-    <uses-sdk android:minSdkVersion="8" android:targetSdkVersion="15" />
-    <uses-permission android:name="android.permission.VIBRATE"/>
-    
+    <uses-sdk
+        android:minSdkVersion="8"
+        android:targetSdkVersion="15" />
+
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:icon="@drawable/ic_launcher"
         android:label="@string/ime_name" >
-        <service 
+        <service
             android:name="Blossom"
-            android:permission="android.permission.BIND_INPUT_METHOD">
+            android:permission="android.permission.BIND_INPUT_METHOD" >
             <intent-filter>
                 <action android:name="android.view.InputMethod" />
             </intent-filter>
-            <meta-data android:name="android.view.im" android:resource="@xml/method" />
+
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
         </service>
         <!-- Optional activities. A good idea to have some user settings. -->
-        <activity android:name="BlossomSettings" android:label="@string/blossom_settings">
+        <activity
+            android:name="BlossomSettings"
+            android:label="@string/blossom_settings" >
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
+                <action android:name="android.intent.action.MAIN" />
             </intent-filter>
-        </activity> 
+        </activity>
     </application>
+
 </manifest>
