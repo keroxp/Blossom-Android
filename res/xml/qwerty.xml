@@ -82,7 +82,7 @@
         <Key android:codes="300,301" android:keyLabel=". ,"
                 android:keyWidth="15%p"/>        
         <!-- Enter -->
-        <Key android:codes="402" android:keyIcon="@drawable/sym_keyboard_return" 
+        <Key android:codes="403" android:keyIcon="@drawable/sym_keyboard_return" 
                 android:keyWidth="20%p" android:keyEdgeFlags="right"/>
     </Row>
 </Keyboard>

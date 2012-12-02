@@ -18,6 +18,7 @@ import me.keroxp.app.blossom.BLKeyboard.BLKey;
 //import net.sf.json.*;
 import org.json.*;
 
+import android.R.bool;
 import android.inputmethodservice.InputMethodService;
 import android.view.inputmethod.CompletionInfo;
 import android.view.inputmethod.EditorInfo;
@@ -33,6 +34,7 @@ import android.text.StaticLayout;
 import android.text.method.MetaKeyKeyListener;
 
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.view.GestureDetector;
 import android.view.GestureDetector.OnDoubleTapListener;
 import android.view.GestureDetector.OnGestureListener;
@@ -45,7 +47,7 @@ import android.widget.SimpleAdapter.ViewBinder;
 import android.util.Log;
 
 public final class Blossom extends InputMethodService implements KeyboardView.OnKeyboardActionListener,
-		View.OnTouchListener, BLKeyboard.BLKey.OnKeyActionListener, OnGestureListener, OnDoubleTapListener {
+		View.OnTouchListener, BLKeyboard.BLKey.OnKeyActionListener, OnGestureListener {
 
 	// おまじないオブジェクト
 	private InputMethodManager InputMethodManager;
@@ -53,6 +55,8 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 
 	// ジェスチャディテクタ
 	private GestureDetector gestureDetector;
+	// バイブレータ
+	private Vibrator vibrator;
 
 	// Keyboardオブジェクト
 	private BLKeyboard mainKeyboard; // メイン
@@ -75,12 +79,11 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 	private JSONObject fullHalfDictionary; // 半角全角変換
 	private JSONObject smallDictionary; // 大文字小文字変換
 
-	// 遷移処理
-	Boolean touching;
-	
-	// 現在のフリック方向
-	int currentFlickDirection = -1;
-	JSONArray currentPiecesArray;
+	// 現在扱っているイベントとそれに関係するオブジェクト
+	MotionEvent currentMotionEvent; // モーションイベント
+	int currentFlickDirection = -1; // フリック方向
+	JSONArray currentPiecesArray; // ピース
+	BLKey currentKey; // キー
 
 	/**
 	 * Main initialization of the input method component. Be sure to call to
@@ -96,7 +99,9 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 		WordSeparators = getResources().getString(R.string.word_separators);
 		// ジェスチャディテクタを初期化
 		gestureDetector = new GestureDetector(this, this);
-		gestureDetector.setOnDoubleTapListener(this);
+		// gestureDetector.setOnDoubleTapListener(this);
+		// バイブレータを取得
+		vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
 
 		// 辞書を初期化
 		try {
@@ -298,7 +303,10 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 		Log.d("BLossom.onKey", "onkey");
 		switch (primaryCode) {
 		case BLKeyboard.deleteKey:
-			this.handleBackspace();
+			handleBackspace();
+			break;
+		case BLKeyboard.enterKey:
+			handleEnter();
 			break;
 		default:
 			break;
@@ -306,8 +314,16 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 	}
 
 	public void keyDidPress(BLKey key) {
-		// Log.d("BLKeyboard.OnKeyActionListener", "key did press : " +
-		// String.valueOf(key.codes[0]));
+		Log.v("keyDidPress", "key did press : " + key.label);		
+		// タッチイベントをハンドリングしている場合はバインドしない
+		if (currentMotionEvent != null) {
+			//return;
+		}
+		// バイブを鳴らす
+		vibrator.vibrate(50);
+		// キーを保存
+		currentKey = key;
+		// 対応するピースを取得
 		JSONArray piecesArray = null;
 		try {
 			piecesArray = this.piecesDictionary.getJSONArray(String.valueOf(key.codes[0]));
@@ -316,132 +332,92 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		// PopupWindowを表示（テスト）
-		if (!this.keyboardView.getPopupWindow().isShowing()) {
-			// Piecesをセット
-			this.keyboardView.setPiecesArray(piecesArray);
-			// 表示
-			this.keyboardView.showPopupWindow(0, -this.keyboardView.getMeasuredHeight());
-		}
 		currentPiecesArray = piecesArray;
-		// キャラクタなら入力
-		if (key.codes[0] < 300) {
-			//getCurrentInputConnection().commitText(key.label, 0);
-		}
+		keyboardView.setPiecesArray(piecesArray);
 	}
 
 	public void keyDidRelease(BLKey key, Boolean inside) {
-		// TODO Auto-generated method stub
-		Log.d("BLKeyboard.OnKeyActionListener", "key did Release : " + String.valueOf(key.codes[0]));
-		if (currentFlickDirection > -1) {
-			if (currentPiecesArray != null) {
-				String s;
-				try {
-					s = currentPiecesArray.getString(currentFlickDirection);
-					getCurrentInputConnection().commitText(s, 0);					
-				} catch (JSONException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}				
-				currentPiecesArray = null;
-				currentFlickDirection = -1;
-			}
+		Log.d("BLKeyboard.OnKeyActionListener", "key did Release : " + String.valueOf(key.label));		
+		// フリック状態なら仮名文字を
+		if (currentPiecesArray != null && currentFlickDirection != -1) {
+			String s;
+			try {
+				s = currentPiecesArray.getString(currentFlickDirection);
+				composedBuffer.append(s);
+				getCurrentInputConnection().setComposingText(composedBuffer, 1);
+				finishKeyInput();
+			} catch (JSONException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}			
 		}else{
-			// キャラクタなら入力
-			if (key.codes[0] < 300) {
-				getCurrentInputConnection().commitText(key.label, 0);
-			}
-		}
-		this.keyboardView.dismissPopupWindow();
+			// そうでなければアルファベットを
+			if (inside) {
+				if (currentKey.codes[0] < 300) {
+					if (longPressed) {
+						// 大文字
+						getCurrentInputConnection().commitText(currentKey.label.toString().toUpperCase(), 0);					
+					}else{
+						// 小文字
+						getCurrentInputConnection().commitText(currentKey.label, 0);
+					}
+					finishKeyInput();
+				}
+			}			
+		}	
 	}
 
-	// Keyが押されたとき、最初に一度だけ呼ばれる。Keyが連続された場合は呼ばれない。順番的には onKeyの前に呼ばれる。
-	public void onPress(int primaryCode) {
-		// 使わない
-	}
-
-	// Keyが離されたら呼ばれる。Keyが連続された場合は呼ばれない。順番的には onKeyの後に呼ばれる。
-	public void onRelease(int primaryCode) {
-		// 使わない
-	}
-
-	public void onText(CharSequence text) {
-		Log.d("onText", String.valueOf(text));
-	}
-
-	public void swipeDown() {
-		// 使わない
-	}
-
-	public void swipeLeft() {
-		// 使わない
-	}
-
-	public void swipeRight() {
-		// 使わない
-	}
-
-	public void swipeUp() {
-		// 使わない
-	}
-
-	/*
-	 * View.OnTouchListener keyboardView上でのタッチイベントはすべてここでバインドする
-	 * Action一覧とかはここにある。ありすぎる。
-	 * http://developer.android.com/reference/android/view/MotionEvent.html
-	 * 
-	 * @see android.view.View.OnTouchListener#onTouch(android.view.View,
-	 * android.view.MotionEvent)
-	 */
-
-	private MotionEvent startEvent;
-	private MotionEvent currentEvent;
-
+	// KeybaordView上のタッチイベントをすべてここでバインドする
 	public boolean onTouch(View v, MotionEvent event) {
-		// あとの処理はGestureDetectorに任せる
-		if (event.getActionMasked() == MotionEvent.ACTION_UP) {
-			this.touching = false;
+		if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+			currentMotionEvent = event;
 		}
+		// あとの処理はGestureDetectorに任せる
 		return this.gestureDetector.onTouchEvent(event);
 	}
 
-	/*
-	 * GestureDetector.OnGestureListener
-	 * KeyboardView.OnTouchListenerからMotionEventを受け取って抽象的なモーションを判別してくれる
-	 * バインドしたらtrueを返す。でもその場合はそれ以外のMotionEventのリスナとかkeyDidReleaseとかが呼ばれないので注意。
-	 * 
-	 * @see android.view.GestureDetector.OnGestureListener#onDown(android.view.
-	 * MotionEvent)
-	 */
+	// 共通の完了処理はここに書く
+	private void finishKeyInput() {
+		longPressed = false;
+		showPressed = false;
+		currentPiecesArray = null;
+		currentFlickDirection = -1;
+		currentKey = null;
+		currentMotionEvent = null;
+		keyboardView.dismissPopupWindow();
+	}
 
-	public boolean onDown(MotionEvent e) {
-		// TODO Auto-generated method stub
-		Log.v("onDown", "on down");
-		this.touching = true;
+	public boolean onDown(MotionEvent e) { 
+		//Log.v("onDown", "on down");
+		// バインドしてはいけない
 		return false;
 	}
 
+	// 一定の距離をドラッグして離した場合の処理
 	public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-		// TODO Auto-generated method stub
-		int THRESHOLD = 10;
-		if (Math.abs(e2.getX() - e1.getX()) > THRESHOLD) {
-			Log.v("onFling", "fling");
-			return false;
-		}
+		Log.v("onFling", "onFling");
 		return false;
-	}
-
-	public void onLongPress(MotionEvent e) {
-		// TODO Auto-generated method stub
-		Log.v("onLongPress", "longpress");
 	}
 
 	public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
 		Log.v("onScroll", "scroll");
-		int dir = getDirection(e2.getRawX(), e2.getRawY(), e1.getRawX(), e1.getRawY());
-		keyboardView.getFlowerLayout().hilightPiece(dir);
-		currentFlickDirection = dir;
-		return true;
+		int THRESHOLD = 2;
+		if (Math.abs(e2.getX() - e1.getX()) > THRESHOLD) {
+			// PopupWindowを表示
+			if (!this.keyboardView.getPopupWindow().isShowing()) {
+				this.keyboardView.showPopupWindow(0, -this.keyboardView.getMeasuredHeight());
+			}
+			// 方向を検知
+			int dir = getDirection(e2.getRawX(), e2.getRawY(), e1.getRawX(), e1.getRawY());
+			// 方向が代わったら指定方向をハイライト
+			if (dir != currentFlickDirection) {
+				currentFlickDirection = dir;
+				keyboardView.getFlowerLayout().hilightPiece(dir);
+				vibrator.vibrate(50);
+			}
+			return true;
+		}
+		return false;
 	}
 
 	// MotionEventから方向を取得するメソッド
@@ -482,32 +458,22 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 		return -1;
 	}
 
+	private boolean longPressed;
+	private boolean showPressed;
+	public void onLongPress(MotionEvent e) {
+		Log.v("onLongPress", "longpress");
+		longPressed = true;
+	}
+
 	public void onShowPress(MotionEvent e) {
 		// TODO Auto-generated method stub
 		Log.v("onShowPress", "showpress");
+		showPressed = true;
 	}
 
 	public boolean onSingleTapUp(MotionEvent e) {
 		// TODO Auto-generated method stub
 		Log.v("onSingleTapUp", "singletapup");
-		return false;
-	}
-
-	public boolean onDoubleTap(MotionEvent arg0) {
-		// TODO Auto-generated method stub
-		Log.v("onDoubleTap", "doubletap");
-		return false;
-	}
-
-	public boolean onDoubleTapEvent(MotionEvent arg0) {
-		// TODO Auto-generated method stub
-		Log.v("onDoubleTapEvent", "doubletapevent");
-		return false;
-	}
-
-	public boolean onSingleTapConfirmed(MotionEvent arg0) {
-		// TODO Auto-generated method stub
-		Log.v("onSingleTapConfirmed", "singletapConirmed");
 		return false;
 	}
 
@@ -525,5 +491,53 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 			keyDownUp(KeyEvent.KEYCODE_DEL);
 		}
 		// updateShiftKeyState(getCurrentInputEditorInfo());
+	}
+	
+	private void handleEnter(){
+		if(composedBuffer.length() > 0){
+			// 確定
+			getCurrentInputConnection().finishComposingText();
+			composedBuffer.setLength(0);
+		}else{
+			// 改行
+			getCurrentInputConnection().commitText("\n", 0);
+		}
+	}
+	
+	private void handleSpace(){
+	}
+
+	/*
+	 * 使わないメソッド
+	 */
+
+	// Keyが押されたとき、最初に一度だけ呼ばれる。Keyが連続された場合は呼ばれない。順番的には onKeyの前に呼ばれる。
+	public void onPress(int primaryCode) {
+		// 使わない
+	}
+
+	// Keyが離されたら呼ばれる。Keyが連続された場合は呼ばれない。順番的には onKeyの後に呼ばれる。
+	public void onRelease(int primaryCode) {
+		// 使わない
+	}
+
+	public void onText(CharSequence text) {
+		Log.d("onText", String.valueOf(text));
+	}
+
+	public void swipeDown() {
+		// 使わない
+	}
+
+	public void swipeLeft() {
+		// 使わない
+	}
+
+	public void swipeRight() {
+		// 使わない
+	}
+
+	public void swipeUp() {
+		// 使わない
 	}
 }
