@@ -69,9 +69,9 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 
   // KeyboardViewオブジェクト
   private BLKeyboardView keyboardView;
-  
   // CandidateViewオブジェクト
   private BLCandidateLayout candidateLayout;
+  private ScrollView candidateScrollView;
 
   // なんだろこれ
   private int mLastDisplayWidth;
@@ -262,10 +262,10 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     // keyboard実体
     keyboardView = (BLKeyboardView)getLayoutInflater().inflate(R.layout.input, null);     
     // 候補ビュー    
-    ScrollView scrollView = new ScrollView(this);
-    scrollView.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 100));
     candidateLayout = (BLCandidateLayout)getLayoutInflater().inflate(R.layout.candidate, null);
-    scrollView.addView(candidateLayout);
+    candidateLayout.setService(this);
+    candidateLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 70));    
+    //scrollView.addView(candidateLayout);
     // KeyboardViewのイベントリスナをこのクラスに
     keyboardView.setOnKeyboardActionListener(this);
     keyboardView.setOnTouchListener(this);
@@ -274,8 +274,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     // Keyboardのプレビューをオフに
     keyboardView.setPreviewEnabled(false);
     // サブビューに追加
-    //linearLayout.addView(candidateLayout,0);
-    linearLayout.addView(scrollView,0);
+    linearLayout.addView(candidateLayout,0);
     linearLayout.addView(keyboardView,1);
     return linearLayout;
   }
@@ -470,9 +469,14 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     currentPiecesArray = null;
     currentFlickDirection = -1;
     currentKeyCode = -1;
-    // currentKey = null;
     currentMotionEvent = null;
     keyboardView.dismissPopupWindow();
+  }
+  
+  private void finishComposing(){
+    composedBuffer.setLength(0);
+    romeBuffer.setLength(0);
+    currentInputMode = InputModeEnglish;
   }
 
   public boolean onDown(MotionEvent e) {
@@ -540,20 +544,15 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
       angle += PI * 2;
 
     if ((0 <= angle && angle < PI * 3 / 10) || (PI * 19 / 10 <= angle && angle <= PI * 2)) {
-      // 右上
-      return BLDirectionUpRight;
-    } else if (PI * 3 / 10 <= angle && angle < PI * 7 / 10) {
-      // 上
-      return BLDirectionUp;
+      return BLDirectionUpRight;      // 右上
+    } else if (PI * 3 / 10 <= angle && angle < PI * 7 / 10) {    
+      return BLDirectionUp;  // 上
     } else if (PI * 7 / 10 <= angle && angle < PI * 11 / 10) {
-      // 左上
-      return BLDirectionUpLeft;
-    } else if (PI * 11 / 10 <= angle && angle < PI * 15 / 10) {
-      // 左下
-      return BLDirectionDownLeft;
-    } else if (PI * 15 / 10 <= angle && angle < PI * 19 / 10) {
-      // 右下
-      return BLDirectionDownRight;
+      return BLDirectionUpLeft;  // 左上
+    } else if (PI * 11 / 10 <= angle && angle < PI * 15 / 10) {     
+      return BLDirectionDownLeft; // 左下
+    } else if (PI * 15 / 10 <= angle && angle < PI * 19 / 10) {      
+      return BLDirectionDownRight; // 右下
     } else {
       Log.d("getDirction", "invalid angel " + String.valueOf(angle));
     }
@@ -574,25 +573,29 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
       }
     }
   }
+  
   /*
    * 候補ビューの更新
-   */  
-  
+   */    
   static final String [] cand1 = {"ほげ","ふが","ばー","もぎゅ","ねが","ぱふ","ふむ","しにょん","うにょん","もにゅん"};
-  static final String [] cand2 = {"つぼみ","えりか","いつき","ゆり","らぶ","みき","いのり","せつな","みゆき","あかね","なお","やよい","なお","れいか","キャンディ（笑）"};
+  static final String [] cand2 = {"つぼみ","えりか","いつき","ゆり","らぶ","みき","いのり","せつな","みゆき","あかね","なお","やよい","なお","れいか"};
   static final String [] EMPTY_STRINGS = {};
     
   private void updateCandidate(int i){    
     if (composedBuffer.length() > 0) {
       candidateLayout.setCandidateStrings((i%2 == 0) ? cand1 : cand2);
     }else{
-      candidateLayout.setCandidateStrings(EMPTY_STRINGS);
+      candidateLayout.setCandidateStrings(EMPTY_STRINGS);      
     }
     candidateIndex++;    
   }
   
   public void candidateSelected(String s){
     Log.v("candidateSelected", s);
+    getCurrentInputConnection().commitText(s, 1);
+    candidateLayout.setCandidateStrings(EMPTY_STRINGS);
+    finishComposing();
+    finishKeyInput();
   }
 
   /*
@@ -633,8 +636,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     if (composedBuffer.length() > 0) {
       // 確定
       getCurrentInputConnection().finishComposingText();
-      composedBuffer.setLength(0);
-      currentInputMode = InputModeEnglish;
+      finishComposing();
       finishKeyInput();
     } else {
       // 改行
