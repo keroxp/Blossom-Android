@@ -202,4 +202,5 @@ public class BLKeyboard extends Keyboard {
   final static int spaceKey = 404;
   final static int numKey = 405;
   final static int smallKey = 406;
+  final static int closeKey = 407;
 }

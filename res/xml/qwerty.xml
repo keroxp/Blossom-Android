@@ -39,7 +39,7 @@
     </Row>
     
     <Row>
-        <Key android:codes="210" android:keyLabel="a" android:horizontalGap="5%p" android:keyEdgeFlags="left"/>
+        <Key android:codes="210" android:keyLabel="a" android:keyEdgeFlags="left"/>
         <Key android:codes="211" android:keyLabel="s"/>
         <Key android:codes="212" android:keyLabel="d"/>
         <Key android:codes="213" android:keyLabel="f"/>
@@ -47,7 +47,8 @@
         <Key android:codes="215" android:keyLabel="h"/>
         <Key android:codes="216" android:keyLabel="j"/>
         <Key android:codes="217" android:keyLabel="k"/>
-        <Key android:codes="218" android:keyLabel="l" android:keyEdgeFlags="right"/>
+        <Key android:codes="218" android:keyLabel="l"/>
+        <Key android:codes="302" android:keyLabel="-" android:keyEdgeFlags="right"/>
     </Row>
     
     <Row>
@@ -70,17 +71,19 @@
     </Row>
     
     <Row android:rowEdgeFlags="bottom">
-        <!-- Done -->
+        <!-- Close -->
         <Key android:codes="407" android:keyIcon="@drawable/sym_keyboard_done"
                 android:keyWidth="20%p" android:keyEdgeFlags="left"/>
         <!-- Number -->
-        <Key android:codes="406" android:keyLabel="123" android:keyWidth="15%p"/>
+        <Key android:codes="406" android:keyLabel="123" android:keyWidth="10%p"/>
+        <!-- Comma -->
+        <Key android:codes="300" android:keyLabel="," android:keyWidth="10%p"/>
         <!-- Space  -->
         <Key android:codes="404" android:keyIcon="@drawable/sym_keyboard_space" 
                 android:keyWidth="30%p" android:isRepeatable="true"/>
-        <!-- Comma, Period -->
-        <Key android:codes="300,301" android:keyLabel=". ,"
-                android:keyWidth="15%p"/>        
+        <!-- Period -->
+        <Key android:codes="301" android:keyLabel="."
+                android:keyWidth="10%p"/>        
         <!-- Enter -->
         <Key android:codes="403" android:keyIcon="@drawable/sym_keyboard_return" 
                 android:keyWidth="20%p" android:keyEdgeFlags="right"/>

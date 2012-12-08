@@ -45,5 +45,5 @@
     "space"   : {"code" : 404,  "center" : "space",  "pieces" : ["","","","",""] },
     "number"  : {"code" : 405,  "center" : "123", "pieces" : ["","","","",""] },
     "small"   : {"code" : 406,  "center" : "小" , "pieces" : ["ゃ","っ","ゅ","ん","ょ"] },
-    "done"  : {"code" : 407, "center" : "↓", "pieces" : ["","","","",""] }
+    "close"  : {"code" : 407, "center" : "↓", "pieces" : ["","","","",""] }
 }

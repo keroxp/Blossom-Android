@@ -11,6 +11,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,6 +19,11 @@ import me.keroxp.app.blossom.BLKeyboard.BLKey;
 
 //import net.sf.json.*;
 import org.json.*;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+
+import com.loopj.android.http.AsyncHttpClient;
+import com.loopj.android.http.AsyncHttpResponseHandler;
 
 import android.R.bool;
 import android.R.string;
@@ -50,9 +56,10 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SimpleAdapter.ViewBinder;
 import android.util.Log;
+import android.util.Xml;
 
 public final class Blossom extends InputMethodService implements KeyboardView.OnKeyboardActionListener,
-    View.OnTouchListener, BLKeyboard.BLKey.OnKeyActionListener, OnGestureListener {
+    View.OnTouchListener, OnGestureListener {
 
   // おまじないオブジェクト
   private InputMethodManager InputMethodManager;
@@ -62,6 +69,8 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
   private GestureDetector gestureDetector;
   // バイブレータ
   private Vibrator vibrator;
+  // XMLパーサ
+  private XmlPullParser xmlPullParser;
 
   // Keyboardオブジェクト
   private BLKeyboard mainKeyboard; // メイン
@@ -114,9 +123,10 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     WordSeparators = getResources().getString(R.string.word_separators);
     // ジェスチャディテクタを初期化
     gestureDetector = new GestureDetector(this, this);
-    // gestureDetector.setOnDoubleTapListener(this);
     // バイブレータを取得
     vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+    // XMLパーサを初期化
+    xmlPullParser = Xml.newPullParser();
 
     // 辞書を初期化
     try {
@@ -131,30 +141,6 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     } catch (JSONException e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
-    }
-  }
-
-  /*
-   * res/rawのjsonファイルからJSONObectを返すメソッド
-   */
-  private JSONObject getDictionary(int res) throws IOException, JSONException {
-    BufferedReader bufferedReader = null;
-    try {
-      InputStream inStream = getResources().openRawResource(res);
-      BufferedInputStream bufferedStream = new BufferedInputStream(inStream);
-      InputStreamReader reader = new InputStreamReader(bufferedStream);
-      bufferedReader = new BufferedReader(reader);
-      StringBuilder builder = new StringBuilder();
-      String line = bufferedReader.readLine();
-      while (line != null) {
-        builder.append(line);
-        line = bufferedReader.readLine();
-      }
-      return new JSONObject(builder.toString());
-    } finally {
-      if (bufferedReader != null) {
-        bufferedReader.close();
-      }
     }
   }
 
@@ -189,7 +175,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
       if (keyCode >= '0' && keyCode <= '9') {
         keyDownUp(keyCode - '0' + KeyEvent.KEYCODE_0);
       } else {
-        getCurrentInputConnection().commitText(String.valueOf((char) keyCode), 1);
+        commitText(String.valueOf((char) keyCode), 1);
       }
       break;
     }
@@ -214,11 +200,6 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 
     // メインキーボードを作成
     mainKeyboard = new BLKeyboard(this, R.xml.qwerty);
-    // デリゲートを設定
-    for (Key key : mainKeyboard.getKeys()) {
-      BLKey bKey = (BLKey) key;
-      bKey.setOnKeyActionListener(this);
-    }
 
   }
 
@@ -245,6 +226,10 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     originalBuffer.setLength(0);
     composedBuffer.setLength(0);
     romeBuffer.setLength(0);
+    currentInputMode = InputModeEnglish;
+    currentFlickDirection = -1;
+    currentKeyCode = -1;
+    currentPiecesArray = null;
   }
 
   /**
@@ -258,14 +243,13 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     // コンテナ
     LinearLayout linearLayout = new LinearLayout(this);
     linearLayout.setOrientation(LinearLayout.VERTICAL);
-    linearLayout.setLayoutParams(new LayoutParams(-2,-2));
+    linearLayout.setLayoutParams(new LayoutParams(-2, -2));
     // keyboard実体
-    keyboardView = (BLKeyboardView)getLayoutInflater().inflate(R.layout.input, null);     
-    // 候補ビュー    
-    candidateLayout = (BLCandidateLayout)getLayoutInflater().inflate(R.layout.candidate, null);
+    keyboardView = (BLKeyboardView) getLayoutInflater().inflate(R.layout.input, null);
+    // 候補ビュー
+    candidateLayout = (BLCandidateLayout) getLayoutInflater().inflate(R.layout.candidate, null);
     candidateLayout.setService(this);
-    candidateLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 70));    
-    //scrollView.addView(candidateLayout);
+    candidateLayout.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, 70));
     // KeyboardViewのイベントリスナをこのクラスに
     keyboardView.setOnKeyboardActionListener(this);
     keyboardView.setOnTouchListener(this);
@@ -273,9 +257,9 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     keyboardView.setKeyboard(mainKeyboard);
     // Keyboardのプレビューをオフに
     keyboardView.setPreviewEnabled(false);
-    // サブビューに追加
-    linearLayout.addView(candidateLayout,0);
-    linearLayout.addView(keyboardView,1);
+    // コンテナのサブビューに追加
+    linearLayout.addView(candidateLayout, 0);
+    linearLayout.addView(keyboardView, 1);
     return linearLayout;
   }
 
@@ -338,6 +322,8 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     case BLKeyboard.enterKey:
       handleEnter();
       break;
+    case BLKeyboard.closeKey:
+      handleClose();
     default:
       break;
     }
@@ -371,7 +357,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
           s = labelDictionary.getString(String.valueOf(primaryCode));
           if (s != null) {
             if (s.length() > 0) {
-              getCurrentInputConnection().setComposingText(s, 1);
+              setComposingText(s, 1);
             }
           }
         } catch (JSONException e) {
@@ -381,7 +367,9 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
       }
     }
   }
+
   private int candidateIndex = 0;
+
   // Keyが離されたら呼ばれる。Keyが連続された場合は呼ばれない。順番的には onKeyの後に呼ばれる。
   public void onRelease(int primaryCode) {
     // 使わない
@@ -393,9 +381,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
       String s;
       try {
         s = currentPiecesArray.getString(currentFlickDirection);
-        composedBuffer.append(s);
-        getCurrentInputConnection().setComposingText(composedBuffer, 1);
-        updateCandidate(candidateIndex);
+        appendComposedBuffer(s);
       } catch (JSONException e1) {
         // TODO Auto-generated catch block
         e1.printStackTrace();
@@ -406,7 +392,6 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
           // 英字を確定
           getCurrentInputConnection().finishComposingText();
         } else if (currentInputMode == InputModeRomeKana) {
-          // ローマ字変換
           if (currentInputMode == InputModeRomeKana) { // ローマ字
             String converted = null;
             String label = null;
@@ -422,37 +407,25 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
               int cl = composedBuffer.length();
               int rl = romeBuffer.length();
               // ローマバッファ分を削除
-              composedBuffer.delete((cl - 1) - (rl - 1), cl);
+              deleteComposedBuffer((cl - 1) - (rl - 1), cl);
               // 変換文字を追加
-              composedBuffer.append(converted);
+              appendComposedBuffer(converted);
               // ローマバッファを空に
               romeBuffer.setLength(0);
             } else {
               // なければローマ字バッファに追加して入力を継続
               romeBuffer.append(label);
-              composedBuffer.append(label);
+              appendComposedBuffer(label);
               if (romeBuffer.length() > 3) {
                 // ホントはここでローマ字変換の可能性がないことをトップダウンで確認しなくてはいけない
                 romeBuffer.setLength(0);
               }
             }
-            getCurrentInputConnection().setComposingText(composedBuffer, 1);
-            updateCandidate(candidateIndex);
-            candidateIndex++;
           }
         }
       }
     }
     finishKeyInput();
-  }
-
-  public void keyDidPress(BLKey key) {
-    // Log.v("keyDidPress", "key did press : " + key.label);
-  }
-
-  public void keyDidRelease(BLKey key, Boolean inside) {
-    // Log.d("BLKeyboard.OnKeyActionListener", "key did Release : " +
-    // String.valueOf(key.label));
   }
 
   // KeybaordView上のタッチイベントをすべてここでバインドする
@@ -462,33 +435,6 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     }
     // あとの処理はGestureDetectorに任せる
     return gestureDetector.onTouchEvent(event);
-  }
-
-  // 共通の完了処理はここに書く
-  private void finishKeyInput() {
-    currentPiecesArray = null;
-    currentFlickDirection = -1;
-    currentKeyCode = -1;
-    currentMotionEvent = null;
-    keyboardView.dismissPopupWindow();
-  }
-  
-  private void finishComposing(){
-    composedBuffer.setLength(0);
-    romeBuffer.setLength(0);
-    currentInputMode = InputModeEnglish;
-  }
-
-  public boolean onDown(MotionEvent e) {
-    // Log.v("onDown", "on down");
-    // バインドしてはいけない
-    return false;
-  }
-
-  // 一定の距離をドラッグして離した場合の処理
-  public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-    // Log.v("onFling", "onFling");
-    return false;
   }
 
   public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
@@ -513,7 +459,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
             // cpaがNullになっている場合があるの
             if (currentPiecesArray != null) {
               s = currentPiecesArray.getString(dir);
-              getCurrentInputConnection().setComposingText(composedBuffer + s, 1);
+              setComposingText(composedBuffer + s, 1);
             }
           } catch (JSONException e) {
             // TODO Auto-generated catch block
@@ -521,43 +467,18 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
           }
         }
         return true;
-      }      
+      }
     }
     return false;
   }
 
   // MotionEventから方向を取得するメソッド
 
-  final int BLDirectionUp = 0;
-  final int BLDirectionUpRight = 1;
-  final int BLDirectionDownRight = 2;
-  final int BLDirectionDownLeft = 3;
-  final int BLDirectionUpLeft = 4;
-
-  private int getDirection(float f, float g, float h, float i) {
-    float dx = f - h;
-    float dy = g - i;
-    double angle = -Math.atan2(dy, dx);
-    double PI = Math.PI;
-
-    if (angle < 0)
-      angle += PI * 2;
-
-    if ((0 <= angle && angle < PI * 3 / 10) || (PI * 19 / 10 <= angle && angle <= PI * 2)) {
-      return BLDirectionUpRight;      // 右上
-    } else if (PI * 3 / 10 <= angle && angle < PI * 7 / 10) {    
-      return BLDirectionUp;  // 上
-    } else if (PI * 7 / 10 <= angle && angle < PI * 11 / 10) {
-      return BLDirectionUpLeft;  // 左上
-    } else if (PI * 11 / 10 <= angle && angle < PI * 15 / 10) {     
-      return BLDirectionDownLeft; // 左下
-    } else if (PI * 15 / 10 <= angle && angle < PI * 19 / 10) {      
-      return BLDirectionDownRight; // 右下
-    } else {
-      Log.d("getDirction", "invalid angel " + String.valueOf(angle));
-    }
-    return -1;
-  }
+  static final int BLDirectionUp = 0;
+  static final int BLDirectionUpRight = 1;
+  static final int BLDirectionDownRight = 2;
+  static final int BLDirectionDownLeft = 3;
+  static final int BLDirectionUpLeft = 4;
 
   public void onLongPress(MotionEvent e) {
     Log.v("onLongPress", "longpress");
@@ -566,36 +487,128 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
       String s;
       try {
         s = labelDictionary.getString(String.valueOf(currentKeyCode));
-        getCurrentInputConnection().setComposingText(s.toUpperCase(), 1);
+        setComposingText(s.toUpperCase(), 1);
       } catch (JSONException e1) {
         // TODO Auto-generated catch block
         e1.printStackTrace();
       }
     }
   }
-  
+
+  /*
+   * compsedBufferの更新ラッパー
+   */
+
+  private void appendComposedBuffer(String string) {
+    composedBuffer.append(string);
+    setComposingText(composedBuffer, composedBuffer.length());
+    updateCandidate();
+  }
+
+  private void replaceComposedBuffer(int start, int end, String string) {
+    composedBuffer.replace(start, end, string);
+  }
+
+  private void deleteComposedBuffer(int start, int end) {
+    int length = composedBuffer.length();
+    if (length > 1) {
+      composedBuffer.delete(start, end);
+      setComposingText(composedBuffer, 1);
+    } else if (length > 0) {
+      composedBuffer.setLength(0);
+      currentInputMode = InputModeEnglish;
+      commitText("", 0);
+    }
+    updateCandidate();
+  }
+
+  private void setComposingText(CharSequence text, int newCursorPosition) {
+    getCurrentInputConnection().setComposingText(text, newCursorPosition);
+    if (currentInputMode == InputModeRomeKana) {
+      int cp = getCurrentInputEditorInfo().initialSelStart;
+      int cpe = getCurrentInputEditorInfo().initialSelEnd;
+      Log.d("setComposingText", String.valueOf(cp) + ":" + String.valueOf(cpe));
+      // getCurrentInputConnection().setSelection(cp, composedBuffer.length());
+    }
+  }
+
+  private void commitText(CharSequence text, int newCursorPosition) {
+    getCurrentInputConnection().commitText(text, newCursorPosition);
+    updateCandidate();
+  }
+
   /*
    * 候補ビューの更新
-   */    
-  static final String [] cand1 = {"ほげ","ふが","ばー","もぎゅ","ねが","ぱふ","ふむ","しにょん","うにょん","もにゅん"};
-  static final String [] cand2 = {"つぼみ","えりか","いつき","ゆり","らぶ","みき","いのり","せつな","みゆき","あかね","なお","やよい","なお","れいか"};
-  static final String [] EMPTY_STRINGS = {};
-    
-  private void updateCandidate(int i){    
+   */
+
+  static final String[] cand1 = { "ほげ", "ふが", "ばー", "もぎゅ", "ねが", "ぱふ", "ふむ", "しにょん", "うにょん", "もにゅん" };
+  static final String[] cand2 = { "つぼみ", "えりか", "いつき", "ゆり", "らぶ", "みき", "いのり", "せつな", "みゆき", "あかね", "なお", "やよい", "なお",
+      "れいか" };
+  static final String[] EMPTY_STRINGS = {};  
+
+  private void updateCandidate() {
     if (composedBuffer.length() > 0) {
-      candidateLayout.setCandidateStrings((i%2 == 0) ? cand1 : cand2);
-    }else{
-      candidateLayout.setCandidateStrings(EMPTY_STRINGS);      
+      // グーグルサジェストから持ってくる
+      AsyncHttpClient client = new AsyncHttpClient();
+      client.get("http://www.google.com/complete/search?output=toolbar&hl=ja&q=" + composedBuffer,
+          new AsyncHttpResponseHandler() {
+            @Override
+            public void onSuccess(String response) {
+              // ここに通信が成功したときの処理をかく
+              //System.out.println(response);
+              try {
+                xmlPullParser.setInput(new StringReader(response));
+              } catch (XmlPullParserException e) {
+                Log.d("XmlPullParserSample", "Error");
+              }
+              try {
+                int eventType;
+                ArrayList<String> suggests = new ArrayList<String>();
+                while ((eventType = xmlPullParser.next()) != XmlPullParser.END_DOCUMENT) {
+                  if (eventType == XmlPullParser.START_TAG && "suggestion".equals(xmlPullParser.getName())) {
+                    String s = xmlPullParser.getAttributeValue(null, "data");
+                    suggests.add(s);
+                  }
+                }
+                Log.v("updateCandidates", suggests.toString());
+                candidateLayout.setCandidates(suggests);
+              } catch (Exception e) {
+                Log.d("XmlPullParserSample", "Error");
+              }
+            }
+          });
+    } else {
+      candidateLayout.setCandidates(null);
     }
-    candidateIndex++;    
+    candidateIndex++;
   }
-  
-  public void candidateSelected(String s){
-    Log.v("candidateSelected", s);
-    getCurrentInputConnection().commitText(s, 1);
-    candidateLayout.setCandidateStrings(EMPTY_STRINGS);
+
+  public void candidateSelected(String string) {
+    Log.v("candidateSelected", string);
+    // setComposingText(s, s.length());
+    commitText(string, string.length());
     finishComposing();
     finishKeyInput();
+  }
+
+  // キーの共通の完了処理はここに書く
+  private void finishKeyInput() {
+    currentPiecesArray = null;
+    currentFlickDirection = -1;
+    currentKeyCode = -1;
+    currentMotionEvent = null;
+    keyboardView.dismissPopupWindow();
+  }
+
+  // コンポージングの終了処理はここに書く
+  private void finishComposing() {
+    // getCurrentInputConnection().setSelection(composedBuffer.length(),
+    // composedBuffer.length());
+    getCurrentInputConnection().finishComposingText();
+    composedBuffer.setLength(0);
+    romeBuffer.setLength(0);
+    currentInputMode = InputModeEnglish;
+    updateCandidate();
   }
 
   /*
@@ -612,16 +625,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
       }
       // composedBufferをトリミング
       final int length = composedBuffer.length();
-      if (length > 1) {
-        composedBuffer.delete(length - 1, length);
-        getCurrentInputConnection().setComposingText(composedBuffer, 1);
-        updateCandidate(candidateIndex);        
-      } else if (length > 0) {
-        composedBuffer.setLength(0);
-        currentInputMode = InputModeEnglish;
-        getCurrentInputConnection().commitText("", 0);        
-        updateCandidate(candidateIndex);
-      }
+      deleteComposedBuffer(length - 1, length);
     } else {
       keyDownUp(KeyEvent.KEYCODE_DEL);
     }
@@ -635,12 +639,12 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
   private void handleEnter() {
     if (composedBuffer.length() > 0) {
       // 確定
-      getCurrentInputConnection().finishComposingText();
       finishComposing();
       finishKeyInput();
     } else {
-      // 改行
-      getCurrentInputConnection().commitText("\n", 1);
+      // 改行とか
+      getCurrentInputConnection().sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER));
+      getCurrentInputConnection().sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER));
     }
   }
 
@@ -650,16 +654,85 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
   private void handleSpace() {
     InputConnection ic = getCurrentInputConnection();
     if (composedBuffer.length() > 0) {
-      // 変換
+      finishComposing();
     } else {
       // スペース
-      ic.commitText(" ", 0);
+      commitText(" ", 1);
     }
+  }
+
+  private void handleClose() {
+    commitText(composedBuffer, composedBuffer.length());
+    requestHideSelf(0);
+    keyboardView.closing();
+  }
+
+  /*
+   * ヘルパーメソッド
+   */
+
+  // res/rawのjsonファイルからJSONObectを返すメソッド
+  private JSONObject getDictionary(int res) throws IOException, JSONException {
+    BufferedReader bufferedReader = null;
+    try {
+      InputStream inStream = getResources().openRawResource(res);
+      BufferedInputStream bufferedStream = new BufferedInputStream(inStream);
+      InputStreamReader reader = new InputStreamReader(bufferedStream);
+      bufferedReader = new BufferedReader(reader);
+      StringBuilder builder = new StringBuilder();
+      String line = bufferedReader.readLine();
+      while (line != null) {
+        builder.append(line);
+        line = bufferedReader.readLine();
+      }
+      return new JSONObject(builder.toString());
+    } finally {
+      if (bufferedReader != null) {
+        bufferedReader.close();
+      }
+    }
+  }
+
+  // 位置から方向を取得するメソッド
+  private int getDirection(float f, float g, float h, float i) {
+    float dx = f - h;
+    float dy = g - i;
+    double angle = -Math.atan2(dy, dx);
+    double PI = Math.PI;
+
+    if (angle < 0)
+      angle += PI * 2;
+
+    if ((0 <= angle && angle < PI * 3 / 10) || (PI * 19 / 10 <= angle && angle <= PI * 2)) {
+      return BLDirectionUpRight; // 右上
+    } else if (PI * 3 / 10 <= angle && angle < PI * 7 / 10) {
+      return BLDirectionUp; // 上
+    } else if (PI * 7 / 10 <= angle && angle < PI * 11 / 10) {
+      return BLDirectionUpLeft; // 左上
+    } else if (PI * 11 / 10 <= angle && angle < PI * 15 / 10) {
+      return BLDirectionDownLeft; // 左下
+    } else if (PI * 15 / 10 <= angle && angle < PI * 19 / 10) {
+      return BLDirectionDownRight; // 右下
+    } else {
+      Log.d("getDirction", "invalid angel " + String.valueOf(angle));
+    }
+    return -1;
   }
 
   /*
    * 使わないメソッド
    */
+
+  public boolean onDown(MotionEvent e) {
+    // Log.v("onDown", "on down");
+    // バインドしてはいけない
+    return false;
+  }
+
+  // 一定の距離をドラッグして離した場合の処理
+  public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+    return false;
+  }
 
   public void onText(CharSequence text) {
     // 多分使わない
