@@ -63,6 +63,23 @@ public class BLCandidateLayout extends ScrollView implements View.OnClickListene
     if (candidates != null) {
       int length = candidates.size();
       if (length > 0) {
+        ArrayList<BLCandidate> cs = new ArrayList<BLCandidateLayout.BLCandidate>(length);
+        for (int i = 0; i < length; i++) {
+          // 列を作成
+          BLCandidate candidate = new BLCandidate(service, this);
+          candidate.setOnClickListener(this);
+          candidate.setIndex(i);
+          candidate.setText(candidates.get(i));
+          cs.add(candidate);
+        }
+        for (int i = 0; i < cs.size(); i++) {
+          BLCandidate c = cs.get(i);
+          // 行を作成
+          TableRow row = new TableRow(getContext());
+          row.setLayoutParams(new LayoutParams(TableLayout.LayoutParams.MATCH_PARENT,
+              TableLayout.LayoutParams.WRAP_CONTENT));
+          row.addView(c);
+        }
         for (int i = 0; i < Math.ceil(length / 3); i++) {
           // 行を作成
           TableRow row = new TableRow(getContext());

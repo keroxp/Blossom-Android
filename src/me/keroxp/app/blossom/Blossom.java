@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -387,7 +389,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
         e1.printStackTrace();
       }
     } else {
-      if (primaryCode < 300) {
+      if (currentKeyCode < 300) {
         if (currentInputMode == InputModeEnglish) {
           // 英字を確定
           getCurrentInputConnection().finishComposingText();
@@ -502,7 +504,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
   private void appendComposedBuffer(String string) {
     composedBuffer.append(string);
     setComposingText(composedBuffer, composedBuffer.length());
-    updateCandidate();
+    updateCandidate(CandidateType.SUGGEST);
   }
 
   private void replaceComposedBuffer(int start, int end, String string) {
@@ -519,7 +521,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
       currentInputMode = InputModeEnglish;
       commitText("", 0);
     }
-    updateCandidate();
+    updateCandidate(CandidateType.SUGGEST);
   }
 
   private void setComposingText(CharSequence text, int newCursorPosition) {
@@ -534,7 +536,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
 
   private void commitText(CharSequence text, int newCursorPosition) {
     getCurrentInputConnection().commitText(text, newCursorPosition);
-    updateCandidate();
+    updateCandidate(CandidateType.SUGGEST);
   }
 
   /*
@@ -545,38 +547,76 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
   static final String[] cand2 = { "つぼみ", "えりか", "いつき", "ゆり", "らぶ", "みき", "いのり", "せつな", "みゆき", "あかね", "なお", "やよい", "なお",
       "れいか" };
   static final String[] EMPTY_STRINGS = {};  
+  
+  enum CandidateType {CONVERSION,SUGGEST,SIMILAR};
 
-  private void updateCandidate() {
-    if (composedBuffer.length() > 0) {
-      // グーグルサジェストから持ってくる
-      AsyncHttpClient client = new AsyncHttpClient();
-      client.get("http://www.google.com/complete/search?output=toolbar&hl=ja&q=" + composedBuffer,
-          new AsyncHttpResponseHandler() {
-            @Override
-            public void onSuccess(String response) {
-              // ここに通信が成功したときの処理をかく
-              //System.out.println(response);
-              try {
-                xmlPullParser.setInput(new StringReader(response));
-              } catch (XmlPullParserException e) {
-                Log.d("XmlPullParserSample", "Error");
-              }
-              try {
-                int eventType;
-                ArrayList<String> suggests = new ArrayList<String>();
-                while ((eventType = xmlPullParser.next()) != XmlPullParser.END_DOCUMENT) {
-                  if (eventType == XmlPullParser.START_TAG && "suggestion".equals(xmlPullParser.getName())) {
-                    String s = xmlPullParser.getAttributeValue(null, "data");
-                    suggests.add(s);
+  private void updateCandidate(CandidateType type) {   
+    if (composedBuffer.length() > 0 && !composedBuffer.equals(' ')) {
+      switch (type) {
+      case CONVERSION:{
+     // グーグル変換から持ってくる
+        AsyncHttpClient client = new AsyncHttpClient();      
+        String url;
+        client.get("http://google.com/transliterate?langpair=ja-Hira%7cja&text="+composedBuffer.toString(),
+            new AsyncHttpResponseHandler() {
+              @Override
+              public void onSuccess(String response) {
+                // ここに通信が成功したときの処理をかく
+                //System.out.println(response);
+                try {
+                  JSONArray a = new JSONArray(response);
+                  JSONArray list = a.getJSONArray(0).getJSONArray(1);
+                  ArrayList<String> converted = new ArrayList<String>(list.length());
+                  for (int i = 0; i < list.length(); i++) {
+                    converted.add(list.getString(i));
                   }
+                  candidateLayout.setCandidates(converted);
+                } catch (JSONException e) {
+                  // TODO Auto-generated catch block
+                  e.printStackTrace();
                 }
-                Log.v("updateCandidates", suggests.toString());
-                candidateLayout.setCandidates(suggests);
-              } catch (Exception e) {
-                Log.d("XmlPullParserSample", "Error");
+                
               }
-            }
-          });
+            });        
+      }
+        break;
+      case SUGGEST: {
+     // グーグルサジェストから持ってくる
+        AsyncHttpClient client = new AsyncHttpClient();      
+        client.get("http://www.google.com/complete/search?output=toolbar&hl=ja&q=" + composedBuffer,
+            new AsyncHttpResponseHandler() {
+              @Override
+              public void onSuccess(String response) {
+                // ここに通信が成功したときの処理をかく
+                //System.out.println(response);
+                try {
+                  xmlPullParser.setInput(new StringReader(response));
+                } catch (XmlPullParserException e) {
+                  Log.d("XmlPullParserSample", "Error");
+                }
+                try {
+                  int eventType;
+                  ArrayList<String> suggests = new ArrayList<String>();
+                  while ((eventType = xmlPullParser.next()) != XmlPullParser.END_DOCUMENT) {
+                    if (eventType == XmlPullParser.START_TAG && "suggestion".equals(xmlPullParser.getName())) {
+                      String s = xmlPullParser.getAttributeValue(null, "data");
+                      suggests.add(s);
+                    }
+                  }
+                  Log.v("updateCandidates", suggests.toString());
+                  candidateLayout.setCandidates(suggests);
+                } catch (Exception e) {
+                  Log.d("XmlPullParserSample", "Error");
+                }
+              }
+            });
+      }
+        break;
+      case SIMILAR:
+        break;
+      default:
+        break;
+      }      
     } else {
       candidateLayout.setCandidates(null);
     }
@@ -608,7 +648,7 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
     composedBuffer.setLength(0);
     romeBuffer.setLength(0);
     currentInputMode = InputModeEnglish;
-    updateCandidate();
+    updateCandidate(CandidateType.SUGGEST);
   }
 
   /*
@@ -654,7 +694,9 @@ public final class Blossom extends InputMethodService implements KeyboardView.On
   private void handleSpace() {
     InputConnection ic = getCurrentInputConnection();
     if (composedBuffer.length() > 0) {
-      finishComposing();
+      //
+      updateCandidate(CandidateType.CONVERSION);
+      //finishComposing();
     } else {
       // スペース
       commitText(" ", 1);
